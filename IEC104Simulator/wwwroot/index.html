@@ -1,0 +1,1729 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IEC 60870-5-104 Slave Simulator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg: #1e1e2e; --bg2: #252536; --bg3: #2d2d44;
+  --text: #cdd6f4; --text2: #a6adc8; --accent: #89b4fa;
+  --green: #a6e3a1; --red: #f38ba8; --yellow: #f9e2af;
+  --orange: #fab387; --blue: #74c7ec; --border: #45475a;
+}
+body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+/* Header */
+.header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 6px 16px; display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
+.header h1 { font-size: 14px; color: var(--accent); white-space: nowrap; }
+.header .status { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.toolbar { display: flex; gap: 8px; margin-left: auto; }
+.btn { background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.btn:hover { background: var(--accent); color: var(--bg); }
+.btn.red { border-color: var(--red); }
+.btn.red:hover { background: var(--red); }
+.btn.green { border-color: var(--green); }
+.btn.green:hover { background: var(--green); }
+
+/* Instance tabs bar */
+.instance-tabs { display: flex; background: var(--bg2); border-bottom: 1px solid var(--border); flex-shrink: 0; overflow-x: auto; }
+.instance-tab { padding: 5px 12px; font-size: 12px; cursor: pointer; border-bottom: 2px solid transparent; color: var(--text2); display: flex; align-items: center; gap: 6px; white-space: nowrap; flex-shrink: 0; }
+.instance-tab:hover { color: var(--text); background: var(--bg3); }
+.instance-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--bg3); }
+.instance-tab .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.dot.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.dot.off { background: var(--red); }
+.instance-tab .close-btn { font-size: 14px; margin-left: 4px; opacity: 0.5; }
+.instance-tab .close-btn:hover { opacity: 1; color: var(--red); }
+.instance-tab-add { padding: 5px 12px; font-size: 14px; cursor: pointer; color: var(--text2); display: flex; align-items: center; }
+.instance-tab-add:hover { color: var(--accent); background: var(--bg3); }
+
+/* Instance panel */
+.instance-panel { display: none; overflow: hidden; height: 100%; }
+.instance-panel.active { display: grid; grid-template-columns: 250px 1fr; grid-template-rows: 1fr; height: 100%; }
+
+/* Main area must fill grid cell and allow inner flex to work */
+.main { min-height: 0; height: 100%; }
+
+/* Sidebar */
+.sidebar { background: var(--bg2); border-right: 1px solid var(--border); overflow-y: auto; font-size: 12px; padding: 4px 0; }
+.sidebar .type-item { padding: 3px 12px 3px 16px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+.sidebar .type-item:hover { background: var(--bg3); }
+.sidebar .type-item.active { background: var(--accent); color: var(--bg); }
+.sidebar .type-item .badge { background: var(--bg3); padding: 0 6px; border-radius: 8px; font-size: 10px; color: var(--text2); margin-left: auto; }
+.type-item.active .badge { background: rgba(0,0,0,0.2); color: var(--bg); }
+
+/* Instance toolbar */
+.inst-toolbar { background: var(--bg2); padding: 4px 12px; display: flex; align-items: center; gap: 8px; font-size: 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.inst-toolbar .inst-info { color: var(--text2); }
+.inst-toolbar .inst-info b { color: var(--accent); }
+
+/* Main area */
+.main { display: flex; flex-direction: column; overflow: hidden; }
+.tabs { display: flex; background: var(--bg2); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.tab { padding: 6px 16px; font-size: 12px; cursor: pointer; border-bottom: 2px solid transparent; color: var(--text2); }
+.tab:hover { color: var(--text); background: var(--bg3); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-content { flex: 1; overflow: hidden; display: none; }
+.tab-content.active { display: flex; flex-direction: column; }
+
+/* Tables */
+.table-wrap { flex: 1; min-height: 0; overflow: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+thead { position: sticky; top: 0; background: var(--bg2); z-index: 1; }
+th { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--border); color: var(--accent); font-weight: 600; white-space: nowrap; }
+td { padding: 5px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+tr:hover { background: var(--bg3); }
+
+/* Value cells */
+.val-on { color: var(--green); font-weight: bold; }
+.val-off { color: var(--text2); }
+.val-num { color: var(--yellow); }
+.val-cmd { color: var(--orange); }
+.mono { font-family: 'Cascadia Code', 'Consolas', monospace; }
+
+/* Inline edit */
+.inline-edit { background: var(--bg); border: 1px solid var(--accent); color: var(--text); padding: 2px 6px; width: 100px; font-size: 12px; border-radius: 3px; }
+.inline-edit select, select.inline-edit { background: var(--bg2); border: 1px solid var(--accent); color: var(--text); padding: 2px 4px; font-size: 12px; border-radius: 3px; width: auto; min-width: 110px; }
+.inline-btn { background: var(--accent); color: var(--bg); border: none; padding: 2px 8px; cursor: pointer; border-radius: 3px; font-size: 11px; margin-left: 4px; }
+
+/* Command panel */
+.cmd-status { padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; }
+.cmd-selected { background: var(--yellow); color: #000; }
+.cmd-executed { background: var(--green); color: #000; }
+.cmd-cancelled { background: var(--red); color: #fff; }
+.cmd-timeout { background: var(--text2); color: #000; }
+
+/* Log panel */
+.log-wrap { flex: 1; overflow-y: auto; background: var(--bg); padding: 4px 8px; font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 11px; line-height: 1.6; }
+.log-entry { display: flex; gap: 8px; }
+.log-time { color: var(--text2); flex-shrink: 0; }
+.log-type { width: 80px; flex-shrink: 0; font-weight: bold; }
+.log-type.server { color: var(--accent); }
+.log-type.connect { color: var(--green); }
+.log-type.disconnect { color: var(--red); }
+.log-type.gi { color: var(--yellow); }
+.log-type.select { color: var(--orange); }
+.log-type.execute { color: var(--green); }
+.log-type.cancel { color: var(--red); }
+.log-type.error { color: var(--red); }
+.log-type.started { color: var(--green); }
+.log-type.cmdReceive { color: var(--blue); }
+.log-type.pulse { color: var(--yellow); }
+.log-type.clockSync { color: var(--accent); }
+.log-msg { color: var(--text); }
+.log-conn { flex-shrink: 0; font-size: 10px; padding: 0 6px; border-radius: 4px; background: rgba(255,255,255,0.08); color: var(--text2); font-family: monospace; border: 1px solid var(--border); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Comm Records */
+.comm-toolbar { display: flex; align-items: center; gap: 12px; padding: 4px 10px; background: var(--bg2); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.comm-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.comm-table th { background: var(--bg2); color: var(--text2); font-size: 11px; font-weight: 600; padding: 4px 8px; border-bottom: 1px solid var(--border); text-align: left; position: sticky; top: 0; z-index: 1; }
+.comm-table td { padding: 3px 8px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; white-space: normal; word-break: break-word; }
+.comm-decode-row td { padding: 2px 12px 6px 24px; font-family: 'Cascadia Code','Consolas',monospace; font-size: 11px; white-space: pre-wrap; word-break: break-all; background: rgba(0,0,0,0.25); color: var(--text1); border-bottom: 1px solid rgba(255,255,255,0.06); }
+.comm-rx { border-left: 3px solid var(--accent); }
+.comm-tx { border-left: 3px solid var(--green); }
+.comm-rx:hover, .comm-tx:hover { background: rgba(255,255,255,0.04); }
+.comm-dir-rx { color: var(--accent); font-weight: bold; font-size: 12px; white-space: nowrap; }
+.comm-dir-tx { color: var(--green); font-weight: bold; font-size: 12px; white-space: nowrap; }
+.comm-val { font-family: 'Cascadia Code', 'Consolas', monospace; color: var(--yellow); }
+
+/* Footer */
+.footer { background: var(--bg2); border-top: 1px solid var(--border); padding: 4px 16px; display: flex; align-items: center; gap: 16px; font-size: 11px; color: var(--text2); flex-shrink: 0; }
+.footer .conn-count { color: var(--green); }
+
+/* Modal */
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
+.modal-overlay.show { display: flex; }
+.modal { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 24px; min-width: 400px; }
+.modal h3 { margin-bottom: 16px; color: var(--accent); }
+.modal label { display: block; margin: 8px 0 4px; font-size: 12px; color: var(--text2); }
+.modal input, .modal select { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 4px; font-size: 13px; }
+.modal .modal-btns { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+
+/* Connection info bar */
+.conn-bar { background: var(--bg3); padding: 4px 12px; font-size: 11px; display: flex; gap: 16px; flex-shrink: 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; align-items: center; border-left: 3px solid var(--red); transition: border-left-color 0.3s; }
+.conn-chip { display: flex; align-items: center; gap: 4px; background: var(--bg); padding: 2px 8px; border-radius: 10px; }
+.conn-chip .dot { width: 6px; height: 6px; }
+
+/* Protocol Info Panel */
+.proto-info { padding: 16px; font-size: 12px; overflow-y: auto; flex: 1; }
+.proto-info h3 { color: var(--accent); margin: 12px 0 6px; }
+.proto-info table { margin: 8px 0; }
+.proto-info td { padding: 3px 10px; }
+.proto-info .mono { font-family: 'Cascadia Code', monospace; color: var(--yellow); }
+
+/* Type spec panel */
+.type-spec-panel { flex-shrink: 0; border-top: 1px solid var(--border); background: var(--bg2); }
+.type-spec-toggle { display: flex; align-items: center; gap: 6px; padding: 4px 12px; cursor: pointer; user-select: none; background: var(--bg3); border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text2); }
+.type-spec-toggle:hover { color: var(--text); background: var(--bg2); }
+.type-spec-toggle .toggle-arrow { font-size: 10px; transition: transform 0.15s; }
+.type-spec-body { overflow: hidden; }
+.type-spec-body.collapsed { display: none; }
+.spec-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.spec-col { padding: 0; }
+.spec-header { background: #1565c0; color: #fff; padding: 5px 12px; font-size: 12px; font-weight: bold; letter-spacing: 0.5px; }
+.spec-body { padding: 8px 12px; font-size: 11px; font-family: 'Cascadia Code', 'Consolas', monospace; line-height: 1.8; }
+.spec-section { color: #90caf9; background: #1a3a5c; padding: 3px 12px; font-size: 11px; font-weight: bold; margin-top: 2px; }
+.spec-row { display: flex; gap: 8px; }
+.spec-key { color: var(--yellow); min-width: 80px; }
+.spec-op { color: var(--text2); min-width: 28px; }
+.spec-val { color: var(--text); }
+.spec-indent { color: var(--text2); padding-left: 24px; }
+.spec-indent .spec-key { color: var(--accent); min-width: 32px; }
+.spec-indent .spec-val { color: var(--text2); }
+.spec-no-sel { padding: 20px; color: var(--text2); font-size: 12px; text-align: center; font-family: inherit; }
+
+/* Detail fields */
+.detail-field { display: inline-block; margin-right: 8px; }
+.detail-label { color: var(--text2); font-size: 11px; font-weight: 600; }
+.val-bsi { font-family: 'Cascadia Code', 'Consolas', monospace; color: var(--blue); font-size: 11px; letter-spacing: 0.5px; }
+.qds-true { color: var(--red); font-weight: bold; }
+.qds-false { color: var(--text2); }
+.qds-cell { cursor: pointer; user-select: none; }
+.qds-cell:hover { background: var(--bg3); text-decoration: underline; }
+
+/* 遥控返校对话框 */
+.rc-container { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 300; pointer-events: none; }
+.rc-container.active { pointer-events: all; background: rgba(0,0,0,0.58); }
+.rc-dialog { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1e2435; border: 2px solid #4a7fd4; border-radius: 4px; min-width: 400px; max-width: 540px; box-shadow: 0 8px 40px rgba(0,0,0,0.7); animation: rcFadeIn 0.15s ease; }
+@keyframes rcFadeIn { from { opacity: 0; transform: translate(-50%,-54%); } to { opacity: 1; transform: translate(-50%,-50%); } }
+.rc-titlebar { background: linear-gradient(90deg, #2c4a80, #1a3060); padding: 8px 14px; display: flex; align-items: center; gap: 8px; }
+.rc-titlebar .rc-ttl { color: #fff; font-size: 13px; font-weight: bold; }
+.rc-titlebar .rc-timer { margin-left: auto; color: #ffcc44; font-size: 12px; font-weight: bold; background: rgba(0,0,0,0.3); padding: 1px 7px; border-radius: 3px; }
+.rc-content { padding: 14px 18px 10px; }
+.rc-question { color: #e8c040; font-size: 13px; font-weight: bold; margin-bottom: 12px; text-align: center; padding: 6px; background: rgba(232,192,64,0.08); border-radius: 3px; }
+.rc-fields { background: rgba(0,0,0,0.25); border: 1px solid var(--border); border-radius: 4px; padding: 8px 14px; }
+.rc-field { display: flex; gap: 6px; padding: 3px 0; font-size: 12px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.rc-field:last-child { border-bottom: none; }
+.rc-field .rfl { color: var(--text2); width: 90px; flex-shrink: 0; }
+.rc-field .rfv { color: #e0e0e0; font-family: 'Cascadia Code', 'Consolas', monospace; }
+.rc-field .rfv.hi { color: #40ccff; font-weight: bold; }
+.rc-footbar { display: flex; gap: 14px; justify-content: center; padding: 12px 18px 14px; border-top: 1px solid var(--border); }
+.rc-btn-ok  { background: #1a5c28; color: #fff; border: 1px solid #2a8c40; padding: 7px 32px; border-radius: 3px; cursor: pointer; font-size: 13px; font-weight: bold; min-width: 110px; }
+.rc-btn-no  { background: #5c1a1a; color: #fff; border: 1px solid #8c2a2a; padding: 7px 32px; border-radius: 3px; cursor: pointer; font-size: 13px; font-weight: bold; min-width: 110px; }
+.rc-btn-ok:hover { background: #217534; }
+.rc-btn-no:hover { background: #752121; }
+</style>
+</head>
+<body>
+
+<!-- 遥控返校对话框容器 -->
+<div class="rc-container" id="pendingContainer"></div>
+
+<!-- Header -->
+<div class="header">
+  <h1>⚡ IEC 60870-5-104 Slave Simulator</h1>
+  <div class="toolbar">
+    <button class="btn green" onclick="showCreateModal()">➕ 新建Slave实例</button>
+  </div>
+  <span id="hubStatus" style="font-size:11px;color:var(--text2)">● SignalR 未连接</span>
+</div>
+
+<!-- Instance Tabs -->
+<div class="instance-tabs" id="instanceTabs"></div>
+
+<!-- Instance Panels Container -->
+<div id="instancePanels" style="flex:1;overflow:hidden;display:flex;flex-direction:column;"></div>
+
+<!-- Footer -->
+<div class="footer">
+  <span>IEC 60870-5-104 Slave Simulator (lib60870.NET)</span>
+  <span>实例数: <b class="conn-count" id="instCount">0</b></span>
+  <span id="activeInstInfo"></span>
+</div>
+
+<!-- Create Instance Modal -->
+<div class="modal-overlay" id="createModal">
+  <div class="modal" style="min-width:480px">
+    <h3>新建 Slave 实例</h3>
+    <div id="createModalError" style="display:none;color:var(--red);background:rgba(255,80,80,0.1);border:1px solid var(--red);border-radius:4px;padding:6px 10px;margin-bottom:8px;font-size:12px"></div>
+    <label>TCP 端口</label>
+    <input type="number" id="newPort" value="2404" min="1" max="65535">
+    <label>公共地址 (CA)</label>
+    <input type="number" id="newCA" value="1" min="0" max="65534">
+    <!-- TLS 配置 -->
+    <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0">
+        <input type="checkbox" id="tlsEnabled" onchange="toggleTlsFields()" style="width:auto">
+        <span style="font-size:13px;color:var(--text)">启用 TLS 加密通信</span>
+      </label>
+      <div id="tlsFields" style="display:none;margin-top:8px">
+        <label>PFX 证书文件路径（服务端证书＋私钥）</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="text" id="pfxPath" placeholder="手动输入完整路径，或点击右侧浏览..." style="flex:1;min-width:0">
+          <button type="button" class="btn" style="white-space:nowrap;flex-shrink:0;padding:5px 12px" onclick="document.getElementById('pfxFileInput').click()">浏览...</button>
+          <input type="file" id="pfxFileInput" accept=".pfx,.p12" style="display:none" onchange="handleCertFile('pfx',this)">
+        </div>
+        <label>PFX 密码</label>
+        <input type="password" id="pfxPassword" placeholder="无密码可留空">
+        <label>CA 证书文件路径（验证主站客户端证书，可空）</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="text" id="caCertPath" placeholder="手动输入完整路径，或点击右侧浏览（可为空）..." style="flex:1;min-width:0">
+          <button type="button" class="btn" style="white-space:nowrap;flex-shrink:0;padding:5px 12px" onclick="document.getElementById('caFileInput').click()">浏览...</button>
+          <input type="file" id="caFileInput" accept=".crt,.cer,.pem" style="display:none" onchange="handleCertFile('ca',this)">
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:8px 0 0">
+          <input type="checkbox" id="requireClientCert" style="width:auto">
+          <span style="font-size:12px;color:var(--text)">要求主站提供并验证客户端证书</span>
+        </label>
+      </div>
+    </div>
+    <!-- 周期上送 -->
+    <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
+      <label>周期背景扫描间隔 (秒，0=禁用, COT=2)</label>
+      <input type="number" id="newPeriodic" value="0" min="0" max="3600" style="width:120px">
+      <div style="font-size:11px;color:var(--text2);margin-top:3px">非0时定时向主站上送所有监视量，有助于保持长连接</div>
+    </div>
+    <!-- APCI 参数 -->
+    <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0">
+        <input type="checkbox" id="apciExpand" onchange="document.getElementById('apciFields').style.display=this.checked?'block':'none'" style="width:auto">
+        <span style="font-size:13px;color:var(--text)">自定义 APCI 参数（默认符合 IEC 104 标准）</span>
+      </label>
+      <div id="apciFields" style="display:none;margin-top:8px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+          <div><label style="font-size:11px;color:var(--text2)">k (发送窗口)</label><input type="number" id="apciK"  value="12" min="1" max="32767"></div>
+          <div><label style="font-size:11px;color:var(--text2)">w (确认窗口)</label><input type="number" id="apciW"  value="8"  min="1" max="32767"></div>
+          <div><label style="font-size:11px;color:var(--text2)">T0 连接超时(s)</label><input type="number" id="apciT0" value="10" min="1" max="255"></div>
+          <div><label style="font-size:11px;color:var(--text2)">T1 发送超时(s)</label><input type="number" id="apciT1" value="15" min="1" max="255"></div>
+          <div><label style="font-size:11px;color:var(--text2)">T2 确认超时(s)</label><input type="number" id="apciT2" value="10" min="1" max="255"></div>
+          <div><label style="font-size:11px;color:var(--text2)">T3 测试帧间隔(s)</label><input type="number" id="apciT3" value="20" min="1" max="255"></div>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px">T1超时断连 / T3空闲发TESTFR / 均为IEC-104 APCI层定时参数</div>
+      </div>
+    </div>
+    <!-- 调试输出 -->
+    <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0">
+        <input type="checkbox" id="debugOutput" style="width:auto">
+        <span style="font-size:13px;color:var(--text)">开启 lib60870 调试输出 (APCI帧级细节 → 控制台)</span>
+      </label>
+      <div style="font-size:11px;color:var(--text2);margin-top:3px">开启后将在服务控制台打印每帧 I/S/U 收发、握手、超时等底层细节，便于抓包排查，生产环境建议关闭</div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn" onclick="hideCreateModal()">取消</button>
+      <button class="btn green" onclick="doCreateInstance()">创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Data Point Modal -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <h3>添加数据点</h3>
+    <label>IOA 地址</label>
+    <input type="number" id="addIoa" min="0" max="16777215">
+    <label>TypeID 类型</label>
+    <select id="addTypeId">
+      <optgroup label="监视方向 - 无时标">
+        <option value="1">M_SP_NA_1 (1) - 单点信息</option>
+        <option value="3">M_DP_NA_1 (3) - 双点信息</option>
+        <option value="5">M_ST_NA_1 (5) - 步位置信息</option>
+        <option value="7">M_BO_NA_1 (7) - 32位串</option>
+        <option value="9">M_ME_NA_1 (9) - 归一化测量值</option>
+        <option value="11">M_ME_NB_1 (11) - 标度化测量值</option>
+        <option value="13">M_ME_NC_1 (13) - 短浮点测量值</option>
+        <option value="15">M_IT_NA_1 (15) - 累计量</option>
+        <option value="20">M_PS_NA_1 (20) - 成组单点</option>
+        <option value="21">M_ME_ND_1 (21) - 无质量归一化</option>
+      </optgroup>
+      <optgroup label="监视方向 - 带CP56Time2a">
+        <option value="30">M_SP_TB_1 (30) - 单点+时标</option>
+        <option value="31">M_DP_TB_1 (31) - 双点+时标</option>
+        <option value="32">M_ST_TB_1 (32) - 步位置+时标</option>
+        <option value="33">M_BO_TB_1 (33) - 32位串+时标</option>
+        <option value="34">M_ME_TD_1 (34) - 归一化+时标</option>
+        <option value="35">M_ME_TE_1 (35) - 标度化+时标</option>
+        <option value="36">M_ME_TF_1 (36) - 浮点+时标</option>
+        <option value="37">M_IT_TB_1 (37) - 累计量+时标</option>
+      </optgroup>
+      <optgroup label="控制方向 - 命令">
+        <option value="45">C_SC_NA_1 (45) - 单点命令</option>
+        <option value="46">C_DC_NA_1 (46) - 双点命令</option>
+        <option value="47">C_RC_NA_1 (47) - 步调节命令</option>
+        <option value="48">C_SE_NA_1 (48) - 设定归一化</option>
+        <option value="49">C_SE_NB_1 (49) - 设定标度值</option>
+        <option value="50">C_SE_NC_1 (50) - 设定浮点</option>
+        <option value="51">C_BO_NA_1 (51) - 32位串命令</option>
+        <option value="58">C_SC_TA_1 (58) - 单命令+时标</option>
+        <option value="59">C_DC_TA_1 (59) - 双命令+时标</option>
+        <option value="60">C_RC_TA_1 (60) - 步调节+时标</option>
+        <option value="61">C_SE_TA_1 (61) - 设定归一化+时标</option>
+        <option value="62">C_SE_TB_1 (62) - 设定标度值+时标</option>
+        <option value="63">C_SE_TC_1 (63) - 设定浮点+时标</option>
+        <option value="64">C_BO_TA_1 (64) - 32位串+时标</option>
+      </optgroup>
+    </select>
+    <label>名称</label>
+    <input type="text" id="addName" placeholder="数据点描述">
+    <label>初始值</label>
+    <input type="number" id="addValue" step="any" value="0">
+    <label title="分组召唤 QOI=21-36; 0=仅全站总召响应">分组 ID (0=无分组; 1-16=分组1-16)</label>
+    <input type="number" id="addGroupId" value="0" min="0" max="16">
+    <div class="modal-btns">
+      <button class="btn" onclick="hideAddModal()">取消</button>
+      <button class="btn green" onclick="doAddDataPoint()">添加</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── SignalR Connection ─────────────────────────────────
+const connection = new signalR.HubConnectionBuilder()
+    .withUrl("/hub")
+    .withAutomaticReconnect()
+    .build();
+
+// ─── State ──────────────────────────────────────────────
+let instances = []; // SlaveInstanceInfo[]
+let activeInstanceId = null;
+// Per-instance state: { dataPoints, commandHistory, logEntries, connections, activeFilter, activeSubTab }
+const instState = {};
+
+const typeGroups = [
+  { label: '单点信息', types: [1, 30], icon: '🔘' },
+  { label: '双点信息', types: [3, 31], icon: '⚪' },
+  { label: '步位置', types: [5, 32], icon: '📐' },
+  { label: '32位串', types: [7, 33], icon: '🔢' },
+  { label: '归一化值', types: [9, 34, 21], icon: '📊' },
+  { label: '标度化值', types: [11, 35], icon: '📈' },
+  { label: '浮点值', types: [13, 36], icon: '🔬' },
+  { label: '累计量', types: [15, 37], icon: '📉' },
+  { label: '成组单点', types: [20], icon: '📋' },
+  { label: '── 命令 ──', types: [], icon: '', isSep: true },
+  { label: '单点命令', types: [45, 58], icon: '⬛' },
+  { label: '双点命令', types: [46, 59], icon: '⬜' },
+  { label: '步调节命令', types: [47, 60], icon: '🔧' },
+  { label: '设定值命令', types: [48, 49, 50, 61, 62, 63], icon: '✏️' },
+  { label: '32位串命令', types: [51, 64], icon: '#️⃣' },
+];
+
+const typeNames = {
+  1:'M_SP_NA_1', 3:'M_DP_NA_1', 5:'M_ST_NA_1', 7:'M_BO_NA_1',
+  9:'M_ME_NA_1', 11:'M_ME_NB_1', 13:'M_ME_NC_1', 15:'M_IT_NA_1',
+  20:'M_PS_NA_1', 21:'M_ME_ND_1',
+  30:'M_SP_TB_1', 31:'M_DP_TB_1', 32:'M_ST_TB_1', 33:'M_BO_TB_1',
+  34:'M_ME_TD_1', 35:'M_ME_TE_1', 36:'M_ME_TF_1', 37:'M_IT_TB_1',
+  45:'C_SC_NA_1', 46:'C_DC_NA_1', 47:'C_RC_NA_1',
+  48:'C_SE_NA_1', 49:'C_SE_NB_1', 50:'C_SE_NC_1', 51:'C_BO_NA_1',
+  58:'C_SC_TA_1', 59:'C_DC_TA_1', 60:'C_RC_TA_1',
+  61:'C_SE_TA_1', 62:'C_SE_TB_1', 63:'C_SE_TC_1', 64:'C_BO_TA_1',
+};
+
+function getState(id) {
+    if (!instState[id]) instState[id] = { dataPoints: [], commandHistory: [], logEntries: [], connections: [], commRecords: [], activeFilter: 'all', activeSubTab: 'datapoints' };
+    return instState[id];
+}
+
+// ─── SignalR Event Handlers ─────────────────────────────
+
+connection.on("instanceList", (list) => {
+    const prevCount = instances.length;
+    instances = list;
+    renderInstanceTabs();
+    if (!activeInstanceId && instances.length > 0) selectInstance(instances[0].id);
+    document.getElementById('instCount').textContent = instances.length;
+    // 刷新当前实例状态栏
+    if (activeInstanceId) renderAll(activeInstanceId);
+    // 只在新建实例成功（实例数增加）时才关闭对话框
+    if (list.length > prevCount) hideCreateModal();
+});
+
+connection.on("instanceRemoved", (id) => {
+    delete instState[id];
+    const panel = document.getElementById(`panel-${id}`);
+    if (panel) panel.remove();
+    if (activeInstanceId === id) {
+        activeInstanceId = null;
+        if (instances.length > 0) selectInstance(instances[0].id);
+    }
+});
+
+connection.on("instanceData", (id, data) => {
+    const s = getState(id);
+    s.connections = data.connections || [];
+    s.dataPoints = data.dataPoints || [];
+    s.logEntries = (data.logs || []).reverse();
+    s.commandHistory = (data.commandHistory || []).reverse();
+    s.commRecords = data.commRecords || [];
+    if (activeInstanceId === id) renderAll(id);
+});
+
+connection.on("masterList", (id, conns) => {
+    getState(id).connections = conns;
+    renderConnBar(id);  // always update, regardless of active instance
+});
+
+connection.on("dataPointUpdate", (id, dp) => {
+    const s = getState(id);
+    const idx = s.dataPoints.findIndex(d => d.ioa === dp.ioa);
+    if (idx >= 0) s.dataPoints[idx] = dp;
+    else s.dataPoints.push(dp);
+    if (activeInstanceId === id) { renderSidebar(id); renderDataPoints(id); }
+});
+
+connection.on("dataPointAdded", (id, dp) => {
+    getState(id).dataPoints.push(dp);
+    if (activeInstanceId === id) { renderSidebar(id); renderDataPoints(id); }
+});
+
+connection.on("dataPointDeleted", (id, ioa) => {
+    const s = getState(id);
+    s.dataPoints = s.dataPoints.filter(d => d.ioa !== ioa);
+    if (activeInstanceId === id) { renderSidebar(id); renderDataPoints(id); }
+});
+
+connection.on("commandReceived", (id, cmd) => {
+    const s = getState(id);
+    s.commandHistory.unshift(cmd);
+    if (s.commandHistory.length > 200) s.commandHistory.pop();
+    if (activeInstanceId === id) renderCommands(id);
+    // If this was a pending command, remove its toast
+    if (cmd.pendingId) removePendingToast(cmd.pendingId);
+});
+
+connection.on("commandPending", (id, cmd) => {
+    showPendingToast(id, cmd);
+});
+
+connection.on("createInstanceError", (msg) => {
+    const errEl = document.getElementById('createModalError');
+    if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
+});
+
+connection.on("log", (id, entry) => {
+    const s = getState(id);
+    s.logEntries.unshift(entry);
+    if (s.logEntries.length > 500) s.logEntries.pop();
+    if (activeInstanceId === id) appendLog(id, entry);
+});
+
+connection.on("commRecord", (id, rec) => {
+    const s = getState(id);
+    s.commRecords.unshift(rec);
+    if (s.commRecords.length > 500) s.commRecords.pop();
+    if (activeInstanceId === id) appendCommRecord(id, rec);
+});
+
+// ─── Connection lifecycle ───────────────────────────────
+
+connection.onreconnecting(() => {
+    document.getElementById('hubStatus').textContent = '● 重新连接中...';
+    document.getElementById('hubStatus').style.color = 'var(--yellow)';
+});
+connection.onreconnected(() => {
+    document.getElementById('hubStatus').textContent = '● SignalR 已连接';
+    document.getElementById('hubStatus').style.color = 'var(--green)';
+    // Re-fetch all instance data after reconnect so connections/state are fresh
+    for (const inst of instances) {
+        connection.invoke("GetInstanceData", inst.id).catch(() => {});
+    }
+});
+connection.onclose(() => {
+    document.getElementById('hubStatus').textContent = '● SignalR 断开';
+    document.getElementById('hubStatus').style.color = 'var(--red)';
+});
+connection.start().then(() => {
+    document.getElementById('hubStatus').textContent = '● SignalR 已连接';
+    document.getElementById('hubStatus').style.color = 'var(--green)';
+}).catch(err => {
+    document.getElementById('hubStatus').textContent = '● 连接失败';
+    document.getElementById('hubStatus').style.color = 'var(--red)';
+    console.error(err);
+});
+
+// Poll connection state every 3 s — guarantees UI catches up even if events are missed
+setInterval(() => {
+    if (activeInstanceId && connection.state === signalR.HubConnectionState.Connected) {
+        connection.invoke("GetInstanceData", activeInstanceId).catch(() => {});
+    }
+}, 3000);
+
+// ─── Instance Tabs ──────────────────────────────────────
+
+function renderInstanceTabs() {
+    const bar = document.getElementById('instanceTabs');
+    let html = '';
+    for (const inst of instances) {
+        const isActive = inst.id === activeInstanceId;
+        html += `<div class="instance-tab ${isActive ? 'active' : ''}" onclick="selectInstance('${inst.id}')">
+            <span class="dot ${inst.isListening ? 'on' : 'off'}"></span>
+            Port:${inst.port} CA:${inst.commonAddress}${inst.tlsEnabled ? ' <span style="color:var(--accent);font-size:10px">TLS</span>' : ''}
+            <span class="close-btn" onclick="event.stopPropagation(); removeInstance('${inst.id}')" title="删除实例">×</span>
+        </div>`;
+    }
+    html += `<div class="instance-tab-add" onclick="showCreateModal()" title="新建实例">＋</div>`;
+    bar.innerHTML = html;
+}
+
+function selectInstance(id) {
+    activeInstanceId = id;
+    renderInstanceTabs();
+    // Show/hide panels
+    document.querySelectorAll('.instance-panel').forEach(p => p.classList.remove('active'));
+    let panel = document.getElementById(`panel-${id}`);
+    if (!panel) {
+        panel = createInstancePanel(id);
+        document.getElementById('instancePanels').appendChild(panel);
+    }
+    panel.classList.add('active');
+    // Always refresh instance data when switching to an instance
+    connection.invoke("GetInstanceData", id).catch(() => {});
+    renderAll(id);
+    // Update footer
+    const inst = instances.find(i => i.id === id);
+    if (inst) document.getElementById('activeInstInfo').textContent = `当前: Port ${inst.port} | CA ${inst.commonAddress} | ${inst.isListening ? '运行中' : '已停止'}`;
+}
+
+function createInstancePanel(id) {
+    const div = document.createElement('div');
+    div.id = `panel-${id}`;
+    div.className = 'instance-panel';
+    div.innerHTML = `
+    <div class="sidebar" id="sidebar-${id}"></div>
+    <div class="main">
+      <div class="inst-toolbar">
+        <span class="inst-info" id="instInfo-${id}"></span>
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="btn green" onclick="startInstance('${id}')">▶ 启动</button>
+          <button class="btn red" onclick="stopInstance('${id}')">⏹ 停止</button>
+          <button class="btn green" onclick="triggerGI('${id}')">📡 总召唤</button>
+          <button class="btn" onclick="showAddModal()">➕ 添加数据点</button>
+        </div>
+      </div>
+      <div class="tabs">
+        <div class="tab active" data-tab="datapoints" data-inst="${id}" onclick="switchSubTab('${id}','datapoints')">📊 数据点</div>
+        <div class="tab" data-tab="commands" data-inst="${id}" onclick="switchSubTab('${id}','commands')">⚙️ 命令记录</div>
+        <div class="tab" data-tab="comm" data-inst="${id}" onclick="switchSubTab('${id}','comm')">📡 通信记录</div>
+        <div class="tab" data-tab="logs" data-inst="${id}" onclick="switchSubTab('${id}','logs')">📋 事件日志</div>
+        <div class="tab" data-tab="protocol" data-inst="${id}" onclick="switchSubTab('${id}','protocol')">📖 协议参考</div>
+      </div>
+      <div class="conn-bar" id="connBar-${id}">无主站连接</div>
+      <div class="tab-content active" id="tab-datapoints-${id}" style="flex-direction:column">
+        <div class="table-wrap" style="flex:1">
+          <table>
+            <thead><tr>
+              <th>IOA</th><th>名称</th><th>TypeID</th><th>详细字段</th>
+              <th>QDS.OV</th><th>QDS.BL</th><th>QDS.SB</th><th>QDS.NT</th><th>QDS.IV</th>
+              <th title="分组召唤 QOI=21-36 使用; 0=无分组">分组</th>
+              <th>最后更新</th><th>操作</th>
+            </tr></thead>
+            <tbody id="dpBody-${id}"></tbody>
+          </table>
+        </div>
+        <div class="type-spec-panel" id="typeSpec-${id}">
+          <div class="type-spec-toggle" onclick="toggleTypeSpec('${id}')">
+            <span class="toggle-arrow" id="typeSpecArrow-${id}">▼</span>
+            <span>协议规范详情</span>
+          </div>
+          <div class="type-spec-body" id="typeSpecBody-${id}"><div class="spec-no-sel">← 在左侧选择数据类型查看详细规范</div></div>
+        </div>
+      </div>
+      <div class="tab-content" id="tab-commands-${id}">
+        <div class="comm-toolbar">
+          <button class="btn" style="padding:3px 10px;font-size:12px" onclick="clearCommands('${id}')">🗑 清空</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>时间</th><th>IOA</th><th>TypeID</th><th>值</th><th>QU</th><th>S/E</th><th>COT</th><th>状态</th><th>连接</th></tr></thead>
+            <tbody id="cmdBody-${id}"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="tab-content" id="tab-comm-${id}">
+        <div class="comm-toolbar" id="commToolbar-${id}">
+          <button class="btn" style="padding:3px 10px;font-size:12px" onclick="clearCommRecords('${id}')">🗑 清空</button>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text2)">
+            <input type="checkbox" id="commAutoScroll-${id}" checked> 自动滚动
+          </label>
+        </div>
+        <div class="table-wrap" id="commWrap-${id}">
+          <table class="comm-table">
+            <thead><tr><th style="width:150px">时间</th><th style="width:48px">方向</th><th style="width:130px">类型</th><th style="width:60px">IOA</th><th style="width:100px">值</th><th style="width:80px">COT</th><th>说明</th><th>连接</th></tr></thead>
+            <tbody id="commBody-${id}"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="tab-content" id="tab-logs-${id}">
+        <div class="comm-toolbar">
+          <button class="btn" style="padding:3px 10px;font-size:12px" onclick="clearLogs('${id}')">🗑 清空</button>
+        </div>
+        <div class="log-wrap" id="logWrap-${id}"></div>
+      </div>
+      <div class="tab-content" id="tab-protocol-${id}">
+        <div class="proto-info">${getProtocolRefHTML()}</div>
+      </div>
+    </div>`;
+    return div;
+}
+
+function renderAll(id) {
+    const inst = instances.find(i => i.id === id);
+    if (inst) {
+        const info = document.getElementById(`instInfo-${id}`);
+        if (info) info.innerHTML = `Port: <b>${inst.port}</b> | CA: <b>${inst.commonAddress}</b> | 状态: <b>${inst.isListening ? '🟢 运行中' : '🔴 已停止'}</b>${inst.tlsEnabled ? ' | <b style="color:var(--accent)">🔒 TLS</b>' : ''}`;
+    }
+    renderSidebar(id);
+    renderDataPoints(id);
+    renderCommands(id);
+    renderCommRecords(id);
+    renderLogs(id);
+    renderConnBar(id);
+}
+
+// ─── Instance Actions ───────────────────────────────────
+
+function startInstance(id) {
+    connection.invoke("StartInstance", id)
+        .catch(err => { alert('启动失败: ' + err); console.error(err); });
+}
+function stopInstance(id) {
+    connection.invoke("StopInstance", id)
+        .catch(err => { alert('停止失败: ' + err); console.error(err); });
+}
+function removeInstance(id) {
+    if (!confirm(`确认删除实例 ${id} ?`)) return;
+    connection.invoke("RemoveInstance", id);
+}
+function triggerGI(id) { connection.invoke("TriggerGI", id); }
+
+let _pfxFileData = null; // { base64, name } — set when user picks a PFX via file dialog
+let _caFileData  = null; // { base64, name } — set when user picks a CA cert via file dialog
+
+function handleCertFile(which, input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const bytes = new Uint8Array(e.target.result);
+        let binary = '';
+        bytes.forEach(b => binary += String.fromCharCode(b));
+        const base64 = btoa(binary);
+        if (which === 'pfx') {
+            _pfxFileData = { base64, name: file.name };
+            document.getElementById('pfxPath').value = file.name;
+        } else {
+            _caFileData = { base64, name: file.name };
+            document.getElementById('caCertPath').value = file.name;
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+function showCreateModal() {
+    const errEl = document.getElementById('createModalError');
+    if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+    document.getElementById('tlsEnabled').checked = false;
+    document.getElementById('tlsFields').style.display = 'none';
+    document.getElementById('pfxPath').value = '';
+    document.getElementById('pfxPassword').value = '';
+    document.getElementById('caCertPath').value = '';
+    document.getElementById('requireClientCert').checked = false;
+    document.getElementById('pfxFileInput').value = '';
+    document.getElementById('caFileInput').value = '';
+    _pfxFileData = null;
+    _caFileData = null;
+    document.getElementById('createModal').classList.add('show');
+}
+function toggleTlsFields() {
+    document.getElementById('tlsFields').style.display =
+        document.getElementById('tlsEnabled').checked ? 'block' : 'none';
+}
+function hideCreateModal() { document.getElementById('createModal').classList.remove('show'); }
+async function doCreateInstance() {
+    const port = parseInt(document.getElementById('newPort').value);
+    const ca = parseInt(document.getElementById('newCA').value);
+    if (isNaN(port) || port < 1 || port > 65535) { alert('端口无效'); return; }
+    if (isNaN(ca) || ca < 0) { alert('CA无效'); return; }
+    const tlsEnabled = document.getElementById('tlsEnabled').checked;
+    let pfxPath = document.getElementById('pfxPath').value.trim();
+    const pfxPassword = document.getElementById('pfxPassword').value;
+    let caCertPath = document.getElementById('caCertPath').value.trim();
+    const requireClientCert = document.getElementById('requireClientCert').checked;
+    if (tlsEnabled && !pfxPath && !_pfxFileData) { alert('启用 TLS 时必须选择或填写 PFX 证书文件'); return; }
+    const errEl = document.getElementById('createModalError');
+    if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+    // Upload cert files chosen via browser file dialog to backend first
+    try {
+        if (tlsEnabled && _pfxFileData) {
+            pfxPath = await connection.invoke('UploadCertFile', _pfxFileData.base64, _pfxFileData.name);
+        }
+        if (_caFileData && caCertPath) {
+            caCertPath = await connection.invoke('UploadCertFile', _caFileData.base64, _caFileData.name);
+        }
+    } catch (e) {
+        if (errEl) { errEl.textContent = '上传证书失败: ' + e; errEl.style.display = 'block'; }
+        return;
+    }
+    connection.invoke('CreateInstance', port, ca, tlsEnabled, pfxPath, pfxPassword, requireClientCert, caCertPath,
+        parseInt(document.getElementById('newPeriodic').value) || 0,
+        parseInt(document.getElementById('apciK').value)  || 12,
+        parseInt(document.getElementById('apciW').value)  || 8,
+        parseInt(document.getElementById('apciT0').value) || 10,
+        parseInt(document.getElementById('apciT1').value) || 15,
+        parseInt(document.getElementById('apciT2').value) || 10,
+        parseInt(document.getElementById('apciT3').value) || 20,
+        document.getElementById('debugOutput').checked)
+        .catch(err => {
+            if (errEl) { errEl.textContent = '创建失败: ' + err; errEl.style.display = 'block'; }
+        });
+    // Modal will be closed by the instanceList handler on success
+}
+
+// ─── Sub-tab switching ──────────────────────────────────
+
+function switchSubTab(id, tab) {
+    getState(id).activeSubTab = tab;
+    const panel = document.getElementById(`panel-${id}`);
+    if (!panel) return;
+    panel.querySelectorAll(`.tab[data-inst="${id}"]`).forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    panel.querySelectorAll('.tab-content').forEach(tc => {
+        const tcId = tc.id;
+        tc.classList.toggle('active', tcId === `tab-${tab}-${id}`);
+    });
+}
+
+// ─── Sidebar ────────────────────────────────────────────
+
+function renderSidebar(id) {
+    const sb = document.getElementById(`sidebar-${id}`);
+    if (!sb) return;
+    const s = getState(id);
+    const dps = s.dataPoints;
+    let html = `<div class="type-item ${s.activeFilter==='all'?'active':''}" onclick="filterType('${id}','all')">📁 全部数据点 <span class="badge">${dps.length}</span></div>`;
+    for (const g of typeGroups) {
+        if (g.isSep) { html += `<div style="padding:6px 12px;color:var(--text2);font-size:11px;font-weight:bold;border-top:1px solid var(--border);margin-top:4px">${g.label}</div>`; continue; }
+        const count = dps.filter(d => g.types.includes(d.typeId)).length;
+        if (count === 0) continue;
+        const fk = g.types.join(',');
+        html += `<div class="type-item ${s.activeFilter===fk?'active':''}" onclick="filterType('${id}','${fk}')">${g.icon} ${g.label} <span class="badge">${count}</span></div>`;
+    }
+    sb.innerHTML = html;
+}
+
+function filterType(id, key) {
+    getState(id).activeFilter = key;
+    renderSidebar(id);
+    renderDataPoints(id);
+    const types = key === 'all' ? [] : key.split(',').map(Number);
+    const panel = document.getElementById(`typeSpec-${id}`);
+    if (panel) {
+        const body = document.getElementById(`typeSpecBody-${id}`);
+        if (body) body.innerHTML = getTypeSpecHTML(types);
+    }
+}
+
+function toggleTypeSpec(id) {
+    const body = document.getElementById(`typeSpecBody-${id}`);
+    const arrow = document.getElementById(`typeSpecArrow-${id}`);
+    if (!body) return;
+    const collapsed = body.classList.toggle('collapsed');
+    if (arrow) arrow.textContent = collapsed ? '▶' : '▼';
+}
+
+function getTypeSpecHTML(types) {
+    if (!types || types.length === 0) return '<div class="spec-no-sel">← 在左侧选择数据类型查看详细规范</div>';
+    const t = types[0];
+    const specs = typeSpecDefs[t] || typeSpecDefs[types.find(x => typeSpecDefs[x])];
+    if (!specs) return '<div class="spec-no-sel">暂无该类型规范说明</div>';
+    const qdsBlock = `
+      <div class="spec-section">品质描述词 QUALITY DESCRIPTOR</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">QDS</span><span class="spec-op">:=</span><span class="spec-val">CP8{OV, RES, BL, SB, NT, IV}</span></div>
+        <div class="spec-row"><span class="spec-key">OV</span><span class="spec-op">:=</span><span class="spec-val">BS1[1]&lt;0..1&gt;</span></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;0&gt;</span><span class="spec-op">:=</span><span class="spec-val">未溢出 (no overflow)</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;1&gt;</span><span class="spec-op">:=</span><span class="spec-val">溢出 (overflow)</span></div></div>
+        <div class="spec-row"><span class="spec-key">RES</span><span class="spec-op">:=</span><span class="spec-val">BS3[2..4]&lt;0&gt; 保留</span></div>
+        <div class="spec-row"><span class="spec-key">BL</span><span class="spec-op">:=</span><span class="spec-val">BS1[5]&lt;0..1&gt;</span></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;0&gt;</span><span class="spec-op">:=</span><span class="spec-val">未被闭锁 (not blocked)</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;1&gt;</span><span class="spec-op">:=</span><span class="spec-val">被闭锁 (blocked)</span></div></div>
+        <div class="spec-row"><span class="spec-key">SB</span><span class="spec-op">:=</span><span class="spec-val">BS1[6]&lt;0..1&gt;</span></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;0&gt;</span><span class="spec-op">:=</span><span class="spec-val">未被取代 (not substituted)</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;1&gt;</span><span class="spec-op">:=</span><span class="spec-val">被取代 (substituted)</span></div></div>
+        <div class="spec-row"><span class="spec-key">NT</span><span class="spec-op">:=</span><span class="spec-val">BS1[7]&lt;0..1&gt;</span></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;0&gt;</span><span class="spec-op">:=</span><span class="spec-val">当前值 (topical)</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;1&gt;</span><span class="spec-op">:=</span><span class="spec-val">非当前值 (not topical)</span></div></div>
+        <div class="spec-row"><span class="spec-key">IV</span><span class="spec-op">:=</span><span class="spec-val">BS1[8]&lt;0..1&gt;</span></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;0&gt;</span><span class="spec-op">:=</span><span class="spec-val">有效 (valid)</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;1&gt;</span><span class="spec-op">:=</span><span class="spec-val">无效 (invalid)</span></div></div>
+      </div>`;
+    return `<div class="spec-cols">
+      <div class="spec-col"><div class="spec-header">${specs.enName}</div>${specs.left}</div>
+      <div class="spec-col" style="border-left:1px solid var(--border)"><div class="spec-header">${specs.cnName}</div>${specs.right || (specs.hasQds ? qdsBlock : '')}</div>
+    </div>`;
+}
+
+const _qdsLeft = `
+  <div class="spec-section">QUALITY DESCRIPTOR</div>
+  <div class="spec-body">
+    <div class="spec-row"><span class="spec-key">QDS</span><span class="spec-op">:=</span><span class="spec-val">CP8{OV,RES,BL,SB,NT,IV}</span></div>
+    <div class="spec-row"><span class="spec-key">OV</span><span class="spec-op">:=</span><span class="spec-val">BS1[1]&lt;0..1&gt;</span></div>
+    <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;0&gt;</span><span class="spec-op">:=</span><span class="spec-val">no overflow</span></div></div>
+    <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;1&gt;</span><span class="spec-op">:=</span><span class="spec-val">overflow</span></div></div>
+    <div class="spec-row"><span class="spec-key">BL</span><span class="spec-op">:=</span><span class="spec-val">BS1[5]&lt;0..1&gt;</span></div>
+    <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;0&gt;</span><span class="spec-op">:=</span><span class="spec-val">not blocked</span></div></div>
+    <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;1&gt;</span><span class="spec-op">:=</span><span class="spec-val">blocked</span></div></div>
+    <div class="spec-row"><span class="spec-key">SB</span><span class="spec-op">:=</span><span class="spec-val">BS1[6]&lt;0..1&gt;</span></div>
+    <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;0&gt;</span><span class="spec-op">:=</span><span class="spec-val">not substituted</span></div></div>
+    <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;1&gt;</span><span class="spec-op">:=</span><span class="spec-val">substituted</span></div></div>
+    <div class="spec-row"><span class="spec-key">NT</span><span class="spec-op">:=</span><span class="spec-val">BS1[7]&lt;0..1&gt;</span></div>
+    <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;0&gt;</span><span class="spec-op">:=</span><span class="spec-val">topical</span></div></div>
+    <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;1&gt;</span><span class="spec-op">:=</span><span class="spec-val">not topical</span></div></div>
+    <div class="spec-row"><span class="spec-key">IV</span><span class="spec-op">:=</span><span class="spec-val">BS1[8]&lt;0..1&gt;</span></div>
+    <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;0&gt;</span><span class="spec-op">:=</span><span class="spec-val">valid</span></div></div>
+    <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;1&gt;</span><span class="spec-op">:=</span><span class="spec-val">invalid</span></div></div>
+  </div>`;
+
+const _qosBlock = (left) => left + `
+  <div class="spec-section">QUALIFIER OF SET-POINT COMMAND</div>
+  <div class="spec-body">
+    <div class="spec-row"><span class="spec-key">QOS</span><span class="spec-op">:=</span><span class="spec-val">CP8{QL, SE}</span></div>
+    <div class="spec-row"><span class="spec-key">QL</span><span class="spec-op">:=</span><span class="spec-val">UI7[1..7]&lt;0..127&gt; 命令限定词</span></div>
+    <div class="spec-row"><span class="spec-key">SE</span><span class="spec-op">:=</span><span class="spec-val">BS1[8]&lt;0..1&gt;</span></div>
+    <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;0&gt;</span><span class="spec-op">:=</span><span class="spec-val">execute 执行</span></div></div>
+    <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;1&gt;</span><span class="spec-op">:=</span><span class="spec-val">select 选择</span></div></div>
+  </div>`;
+
+const _quBlock = (left) => left + `
+  <div class="spec-section">QUALIFIER OF COMMAND</div>
+  <div class="spec-body">
+    <div class="spec-row"><span class="spec-key">QU</span><span class="spec-op">:=</span><span class="spec-val">UI5[2..6]&lt;0..31&gt;</span></div>
+    <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;0&gt;</span><span class="spec-op">:=</span><span class="spec-val">无附加定义 (no additional)</span></div></div>
+    <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;1&gt;</span><span class="spec-op">:=</span><span class="spec-val">短脉冲 (short pulse)</span></div></div>
+    <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;2&gt;</span><span class="spec-op">:=</span><span class="spec-val">长脉冲 (long pulse)</span></div></div>
+    <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;3&gt;</span><span class="spec-op">:=</span><span class="spec-val">持续输出 (persistent)</span></div></div>
+    <div class="spec-row"><span class="spec-key">SE</span><span class="spec-op">:=</span><span class="spec-val">BS1[8]&lt;0..1&gt;</span></div>
+    <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;0&gt;</span><span class="spec-op">:=</span><span class="spec-val">execute 执行</span></div></div>
+    <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;1&gt;</span><span class="spec-op">:=</span><span class="spec-val">select 选择</span></div></div>
+  </div>`;
+
+const typeSpecDefs = {
+  // Single point
+  1: {
+    enName: 'M_SP_NA_1 (1) - Single-Point Information',
+    cnName: 'M_SP_NA_1 (1) - 单点遥信',
+    hasQds: true,
+    left: `
+      <div class="spec-section">SINGLE-POINT INFORMATION WITH QUALITY DESCRIPTOR</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">SIQ</span><span class="spec-op">:=</span><span class="spec-val">CP8{SPI, RES, BL, SB, NT, IV}</span></div>
+        <div class="spec-row"><span class="spec-key">SPI</span><span class="spec-op">:=</span><span class="spec-val">BS1[1]&lt;0..1&gt;</span></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;0&gt;</span><span class="spec-op">:=</span><span class="spec-val">OFF state</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;1&gt;</span><span class="spec-op">:=</span><span class="spec-val">ON state</span></div></div>
+      </div>` + _qdsLeft
+  },
+  30: {
+    enName: 'M_SP_TB_1 (30) - Single-Point + CP56Time2a',
+    cnName: 'M_SP_TB_1 (30) - 单点遥信带时标',
+    hasQds: true,
+    left: `
+      <div class="spec-section">SINGLE-POINT INFORMATION WITH TIME TAG</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">SIQ</span><span class="spec-op">:=</span><span class="spec-val">CP8{SPI, RES, BL, SB, NT, IV}</span></div>
+        <div class="spec-row"><span class="spec-key">SPI</span><span class="spec-op">:=</span><span class="spec-val">BS1[1]&lt;0..1&gt;  0=OFF  1=ON</span></div>
+        <div class="spec-row"><span class="spec-key">CP56</span><span class="spec-op">:=</span><span class="spec-val">7字节时标 (ms+min+h+dom+mon+yr)</span></div>
+      </div>` + _qdsLeft
+  },
+  // Double point
+  3: {
+    enName: 'M_DP_NA_1 (3) - Double-Point Information',
+    cnName: 'M_DP_NA_1 (3) - 双点遥信',
+    hasQds: true,
+    left: `
+      <div class="spec-section">DOUBLE-POINT INFORMATION WITH QUALITY DESCRIPTOR</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">DIQ</span><span class="spec-op">:=</span><span class="spec-val">CP8{DPI, RES, BL, SB, NT, IV}</span></div>
+        <div class="spec-row"><span class="spec-key">DPI</span><span class="spec-op">:=</span><span class="spec-val">UI2[1..2]&lt;0..3&gt;</span></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;0&gt;</span><span class="spec-op">:=</span><span class="spec-val">indeterminate or intermediate</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;1&gt;</span><span class="spec-op">:=</span><span class="spec-val">determined state OFF</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;2&gt;</span><span class="spec-op">:=</span><span class="spec-val">determined state ON</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;3&gt;</span><span class="spec-op">:=</span><span class="spec-val">indeterminate</span></div></div>
+      </div>` + _qdsLeft
+  },
+  31: {
+    enName: 'M_DP_TB_1 (31) - Double-Point + CP56Time2a',
+    cnName: 'M_DP_TB_1 (31) - 双点遥信带时标',
+    hasQds: true,
+    left: `
+      <div class="spec-section">DOUBLE-POINT INFORMATION WITH TIME TAG</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">DIQ</span><span class="spec-op">:=</span><span class="spec-val">CP8{DPI, RES, BL, SB, NT, IV}</span></div>
+        <div class="spec-row"><span class="spec-key">DPI</span><span class="spec-op">:=</span><span class="spec-val">UI2[1..2]  0=不定 1=OFF 2=ON 3=不定</span></div>
+        <div class="spec-row"><span class="spec-key">CP56</span><span class="spec-op">:=</span><span class="spec-val">7字节时标</span></div>
+      </div>` + _qdsLeft
+  },
+  // Step position
+  5: {
+    enName: 'M_ST_NA_1 (5) - Step Position Information',
+    cnName: 'M_ST_NA_1 (5) - 步位置信息',
+    hasQds: true,
+    left: `
+      <div class="spec-section">STEP POSITION INFORMATION</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">VTI</span><span class="spec-op">:=</span><span class="spec-val">CP8{V, T}</span></div>
+        <div class="spec-row"><span class="spec-key">V</span><span class="spec-op">:=</span><span class="spec-val">I7[1..7]&lt;-64..63&gt; 步位置值</span></div>
+        <div class="spec-row"><span class="spec-key">T</span><span class="spec-op">:=</span><span class="spec-val">BS1[8]&lt;0..1&gt;</span></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;0&gt;</span><span class="spec-op">:=</span><span class="spec-val">equipment is not in transient state</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;1&gt;</span><span class="spec-op">:=</span><span class="spec-val">equipment is in transient state</span></div></div>
+      </div>` + _qdsLeft
+  },
+  32: {
+    enName: 'M_ST_TB_1 (32) - Step Position + CP56Time2a',
+    cnName: 'M_ST_TB_1 (32) - 步位置信息带时标',
+    hasQds: true,
+    left: `
+      <div class="spec-section">STEP POSITION INFORMATION WITH TIME TAG</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">VTI</span><span class="spec-op">:=</span><span class="spec-val">I7[1..7]&lt;-64..63&gt; + T(transient bit)</span></div>
+        <div class="spec-row"><span class="spec-key">CP56</span><span class="spec-op">:=</span><span class="spec-val">7字节时标</span></div>
+      </div>` + _qdsLeft
+  },
+  // 32-bit string
+  7: {
+    enName: 'M_BO_NA_1 (7) - Bitstring of 32 Bits',
+    cnName: 'M_BO_NA_1 (7) - 32位串',
+    hasQds: true,
+    left: `
+      <div class="spec-section">BINARY STATE INFORMATION 32 BIT</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">BSI</span><span class="spec-op">:=</span><span class="spec-val">32BS1[1..32]&lt;0..1&gt;</span></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">bit1</span><span class="spec-op">=</span><span class="spec-val">最低有效位 (LSB)</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">bit32</span><span class="spec-op">=</span><span class="spec-val">最高有效位 (MSB)</span></div></div>
+      </div>` + _qdsLeft
+  },
+  33: {
+    enName: 'M_BO_TB_1 (33) - Bitstring 32bit + CP56Time2a',
+    cnName: 'M_BO_TB_1 (33) - 32位串带时标',
+    hasQds: true,
+    left: `
+      <div class="spec-section">BINARY STATE INFORMATION 32 BIT WITH TIME TAG</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">BSI</span><span class="spec-op">:=</span><span class="spec-val">32BS1[1..32]&lt;0..1&gt;</span></div>
+        <div class="spec-row"><span class="spec-key">CP56</span><span class="spec-op">:=</span><span class="spec-val">7字节时标</span></div>
+      </div>` + _qdsLeft
+  },
+  // Normalized
+  9: {
+    enName: 'M_ME_NA_1 (9) - Normalized Measured Value',
+    cnName: 'M_ME_NA_1 (9) - 归一化测量值',
+    hasQds: true,
+    left: `
+      <div class="spec-section">NORMALIZED MEASURED VALUE</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">NVA</span><span class="spec-op">:=</span><span class="spec-val">F16[1..16]&lt;-1..+1-2^-15&gt;</span></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">范围</span><span class="spec-op">=</span><span class="spec-val">-1.0 到 +0.999969...</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">精度</span><span class="spec-op">=</span><span class="spec-val">2^-15 ≈ 0.0000305</span></div></div>
+      </div>` + _qdsLeft
+  },
+  21: {
+    enName: 'M_ME_ND_1 (21) - Normalized Value (no QDS)',
+    cnName: 'M_ME_ND_1 (21) - 无品质归一化值',
+    hasQds: false,
+    left: `
+      <div class="spec-section">NORMALIZED MEASURED VALUE WITHOUT QUALITY DESCRIPTOR</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">NVA</span><span class="spec-op">:=</span><span class="spec-val">F16[1..16]&lt;-1..+1-2^-15&gt;</span></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">说明</span><span class="spec-op">=</span><span class="spec-val">仅含数值, 无品质描述词 (QDS)</span></div></div>
+      </div>`
+  },
+  34: {
+    enName: 'M_ME_TD_1 (34) - Normalized + CP56Time2a',
+    cnName: 'M_ME_TD_1 (34) - 归一化测量值带时标',
+    hasQds: true,
+    left: `
+      <div class="spec-section">NORMALIZED MEASURED VALUE WITH TIME TAG</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">NVA</span><span class="spec-op">:=</span><span class="spec-val">F16[1..16]&lt;-1..+1-2^-15&gt;</span></div>
+        <div class="spec-row"><span class="spec-key">CP56</span><span class="spec-op">:=</span><span class="spec-val">7字节时标</span></div>
+      </div>` + _qdsLeft
+  },
+  // Scaled
+  11: {
+    enName: 'M_ME_NB_1 (11) - Scaled Measured Value',
+    cnName: 'M_ME_NB_1 (11) - 标度化测量值',
+    hasQds: true,
+    left: `
+      <div class="spec-section">SCALED MEASURED VALUE</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">SVA</span><span class="spec-op">:=</span><span class="spec-val">I16[1..16]&lt;-32768..+32767&gt;</span></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">类型</span><span class="spec-op">=</span><span class="spec-val">有符号16位整数</span></div></div>
+      </div>` + _qdsLeft
+  },
+  35: {
+    enName: 'M_ME_TE_1 (35) - Scaled + CP56Time2a',
+    cnName: 'M_ME_TE_1 (35) - 标度化测量值带时标',
+    hasQds: true,
+    left: `
+      <div class="spec-section">SCALED MEASURED VALUE WITH TIME TAG</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">SVA</span><span class="spec-op">:=</span><span class="spec-val">I16[1..16]&lt;-32768..+32767&gt;</span></div>
+        <div class="spec-row"><span class="spec-key">CP56</span><span class="spec-op">:=</span><span class="spec-val">7字节时标</span></div>
+      </div>` + _qdsLeft
+  },
+  // Float
+  13: {
+    enName: 'M_ME_NC_1 (13) - Short Floating Point',
+    cnName: 'M_ME_NC_1 (13) - 短浮点测量值',
+    hasQds: true,
+    left: `
+      <div class="spec-section">SHORT FLOATING POINT NUMBER</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">R32</span><span class="spec-op">:=</span><span class="spec-val">IEEE STD 754 (32-bit float)</span></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">S</span><span class="spec-op">=</span><span class="spec-val">bit31 符号位</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">E</span><span class="spec-op">=</span><span class="spec-val">bit23-30 指数 (8bit)</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">F</span><span class="spec-op">=</span><span class="spec-val">bit0-22 尾数 (23bit)</span></div></div>
+      </div>` + _qdsLeft
+  },
+  36: {
+    enName: 'M_ME_TF_1 (36) - Short Float + CP56Time2a',
+    cnName: 'M_ME_TF_1 (36) - 短浮点测量值带时标',
+    hasQds: true,
+    left: `
+      <div class="spec-section">SHORT FLOATING POINT NUMBER WITH TIME TAG</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">R32</span><span class="spec-op">:=</span><span class="spec-val">IEEE STD 754 (32-bit)</span></div>
+        <div class="spec-row"><span class="spec-key">CP56</span><span class="spec-op">:=</span><span class="spec-val">7字节时标</span></div>
+      </div>` + _qdsLeft
+  },
+  // Counter
+  15: {
+    enName: 'M_IT_NA_1 (15) - Integrated Totals',
+    cnName: 'M_IT_NA_1 (15) - 累计量',
+    hasQds: false,
+    left: `
+      <div class="spec-section">BINARY COUNTER READING</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">BCR</span><span class="spec-op">:=</span><span class="spec-val">CP40{BCRi, SEQ}</span></div>
+        <div class="spec-row"><span class="spec-key">BCRi</span><span class="spec-op">:=</span><span class="spec-val">I32[1..32] 计数值</span></div>
+        <div class="spec-row"><span class="spec-key">SEQ</span><span class="spec-op">:=</span><span class="spec-val">CP8{SQ, CY, CA, IV}</span></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">SQ</span><span class="spec-op">=</span><span class="spec-val">UI5 顺序号</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">CY</span><span class="spec-op">=</span><span class="spec-val">进位标志</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">CA</span><span class="spec-op">=</span><span class="spec-val">计数器已调整</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">IV</span><span class="spec-op">=</span><span class="spec-val">无效</span></div></div>
+      </div>`
+  },
+  37: {
+    enName: 'M_IT_TB_1 (37) - Integrated Totals + CP56Time2a',
+    cnName: 'M_IT_TB_1 (37) - 累计量带时标',
+    hasQds: false,
+    left: `
+      <div class="spec-section">INTEGRATED TOTALS WITH TIME TAG</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">BCR</span><span class="spec-op">:=</span><span class="spec-val">I32 计数值 + SEQ{SQ,CY,CA,IV}</span></div>
+        <div class="spec-row"><span class="spec-key">CP56</span><span class="spec-op">:=</span><span class="spec-val">7字节时标</span></div>
+      </div>`
+  },
+  // Grouped SP
+  20: {
+    enName: 'M_PS_NA_1 (20) - Packed Single-Point with SCD',
+    cnName: 'M_PS_NA_1 (20) - 成组单点遥信',
+    hasQds: true,
+    left: `
+      <div class="spec-section">PACKED SINGLE-POINT INFORMATION WITH STATUS CHANGE DETECTION</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">SCD</span><span class="spec-op">:=</span><span class="spec-val">CP32{STi, CDi}  i=1..16</span></div>
+        <div class="spec-row"><span class="spec-key">STn</span><span class="spec-op">:=</span><span class="spec-val">16BS1[1..16] 状态位 (0=OFF 1=ON)</span></div>
+        <div class="spec-row"><span class="spec-key">CDn</span><span class="spec-op">:=</span><span class="spec-val">16BS1[17..32] 变化检出位</span></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;0&gt;</span><span class="spec-op">:=</span><span class="spec-val">此次询问周期内无变化</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;1&gt;</span><span class="spec-op">:=</span><span class="spec-val">此次询问周期内有变化</span></div></div>
+      </div>` + _qdsLeft
+  },
+  // Commands
+  45: {
+    enName: 'C_SC_NA_1 (45) - Single Command',
+    cnName: 'C_SC_NA_1 (45) - 单点命令',
+    hasQds: false,
+    left: _quBlock(`
+      <div class="spec-section">SINGLE COMMAND</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">SCO</span><span class="spec-op">:=</span><span class="spec-val">CP8{SCS, RES, QU, SE}</span></div>
+        <div class="spec-row"><span class="spec-key">SCS</span><span class="spec-op">:=</span><span class="spec-val">BS1[1]&lt;0..1&gt;</span></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;0&gt;</span><span class="spec-op">:=</span><span class="spec-val">OFF</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;1&gt;</span><span class="spec-op">:=</span><span class="spec-val">ON</span></div></div>
+      </div>`)
+  },
+  58: {
+    enName: 'C_SC_TA_1 (58) - Single Command + CP56Time2a',
+    cnName: 'C_SC_TA_1 (58) - 单点命令带时标',
+    hasQds: false,
+    left: _quBlock(`
+      <div class="spec-section">SINGLE COMMAND WITH TIME TAG</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">SCO</span><span class="spec-op">:=</span><span class="spec-val">SCS(1bit) + QU(5bit) + SE(1bit)</span></div>
+        <div class="spec-row"><span class="spec-key">CP56</span><span class="spec-op">:=</span><span class="spec-val">7字节时标</span></div>
+      </div>`)
+  },
+  46: {
+    enName: 'C_DC_NA_1 (46) - Double Command',
+    cnName: 'C_DC_NA_1 (46) - 双点命令',
+    hasQds: false,
+    left: _quBlock(`
+      <div class="spec-section">DOUBLE COMMAND</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">DCO</span><span class="spec-op">:=</span><span class="spec-val">CP8{DCS, QU, SE}</span></div>
+        <div class="spec-row"><span class="spec-key">DCS</span><span class="spec-op">:=</span><span class="spec-val">UI2[1..2]&lt;0..3&gt;</span></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;0&gt;</span><span class="spec-op">:=</span><span class="spec-val">not permitted 不允许</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;1&gt;</span><span class="spec-op">:=</span><span class="spec-val">OFF</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;2&gt;</span><span class="spec-op">:=</span><span class="spec-val">ON</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;3&gt;</span><span class="spec-op">:=</span><span class="spec-val">not permitted 不允许</span></div></div>
+      </div>`)
+  },
+  59: {
+    enName: 'C_DC_TA_1 (59) - Double Command + CP56Time2a',
+    cnName: 'C_DC_TA_1 (59) - 双点命令带时标',
+    hasQds: false,
+    left: _quBlock(`
+      <div class="spec-section">DOUBLE COMMAND WITH TIME TAG</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">DCO</span><span class="spec-op">:=</span><span class="spec-val">DCS(2bit) + QU(5bit) + SE(1bit)</span></div>
+        <div class="spec-row"><span class="spec-key">CP56</span><span class="spec-op">:=</span><span class="spec-val">7字节时标</span></div>
+      </div>`)
+  },
+  47: {
+    enName: 'C_RC_NA_1 (47) - Regulating Step Command',
+    cnName: 'C_RC_NA_1 (47) - 步调节命令',
+    hasQds: false,
+    left: _quBlock(`
+      <div class="spec-section">REGULATING STEP COMMAND</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">RCO</span><span class="spec-op">:=</span><span class="spec-val">CP8{RCS, QU, SE}</span></div>
+        <div class="spec-row"><span class="spec-key">RCS</span><span class="spec-op">:=</span><span class="spec-val">UI2[1..2]&lt;0..3&gt;</span></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;0&gt;</span><span class="spec-op">:=</span><span class="spec-val">not permitted</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;1&gt;</span><span class="spec-op">:=</span><span class="spec-val">next step LOWER</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;2&gt;</span><span class="spec-op">:=</span><span class="spec-val">next step HIGHER</span></div></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">&lt;3&gt;</span><span class="spec-op">:=</span><span class="spec-val">not permitted</span></div></div>
+      </div>`)
+  },
+  60: {
+    enName: 'C_RC_TA_1 (60) - Regulating Step + CP56Time2a',
+    cnName: 'C_RC_TA_1 (60) - 步调节命令带时标',
+    hasQds: false,
+    left: _quBlock(`
+      <div class="spec-section">REGULATING STEP COMMAND WITH TIME TAG</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">RCO</span><span class="spec-op">:=</span><span class="spec-val">RCS(2bit, 1=低 2=高) + QU(5bit) + SE(1bit)</span></div>
+        <div class="spec-row"><span class="spec-key">CP56</span><span class="spec-op">:=</span><span class="spec-val">7字节时标</span></div>
+      </div>`)
+  },
+  48: {
+    enName: 'C_SE_NA_1 (48) - Set-Point Command, Normalized',
+    cnName: 'C_SE_NA_1 (48) - 设定归一化值命令',
+    hasQds: false,
+    left: _qosBlock(`
+      <div class="spec-section">SET-POINT COMMAND, NORMALIZED VALUE</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">NVA</span><span class="spec-op">:=</span><span class="spec-val">F16[1..16]&lt;-1..+1-2^-15&gt;</span></div>
+      </div>`)
+  },
+  49: {
+    enName: 'C_SE_NB_1 (49) - Set-Point Command, Scaled',
+    cnName: 'C_SE_NB_1 (49) - 设定标度值命令',
+    hasQds: false,
+    left: _qosBlock(`
+      <div class="spec-section">SET-POINT COMMAND, SCALED VALUE</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">SVA</span><span class="spec-op">:=</span><span class="spec-val">I16[1..16]&lt;-32768..+32767&gt;</span></div>
+      </div>`)
+  },
+  50: {
+    enName: 'C_SE_NC_1 (50) - Set-Point Command, Float',
+    cnName: 'C_SE_NC_1 (50) - 设定浮点值命令',
+    hasQds: false,
+    left: _qosBlock(`
+      <div class="spec-section">SET-POINT COMMAND, SHORT FLOAT</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">R32</span><span class="spec-op">:=</span><span class="spec-val">IEEE STD 754 (32-bit float)</span></div>
+      </div>`)
+  },
+  61: { enName: 'C_SE_TA_1 (61) - Set-Point Normalized + CP56Time2a', cnName: 'C_SE_TA_1 (61) - 设定归一化带时标', hasQds: false, left: _qosBlock(`<div class="spec-section">SET-POINT NORMALIZED WITH TIME TAG</div><div class="spec-body"><div class="spec-row"><span class="spec-key">NVA</span><span class="spec-op">:=</span><span class="spec-val">F16 + CP56Time2a</span></div></div>`) },
+  62: { enName: 'C_SE_TB_1 (62) - Set-Point Scaled + CP56Time2a', cnName: 'C_SE_TB_1 (62) - 设定标度值带时标', hasQds: false, left: _qosBlock(`<div class="spec-section">SET-POINT SCALED WITH TIME TAG</div><div class="spec-body"><div class="spec-row"><span class="spec-key">SVA</span><span class="spec-op">:=</span><span class="spec-val">I16 + CP56Time2a</span></div></div>`) },
+  63: { enName: 'C_SE_TC_1 (63) - Set-Point Float + CP56Time2a', cnName: 'C_SE_TC_1 (63) - 设定浮点带时标', hasQds: false, left: _qosBlock(`<div class="spec-section">SET-POINT FLOAT WITH TIME TAG</div><div class="spec-body"><div class="spec-row"><span class="spec-key">R32</span><span class="spec-op">:=</span><span class="spec-val">IEEE754 float + CP56Time2a</span></div></div>`) },
+  51: {
+    enName: 'C_BO_NA_1 (51) - Bitstring of 32 Bits Command',
+    cnName: 'C_BO_NA_1 (51) - 32位串命令',
+    hasQds: false,
+    left: `
+      <div class="spec-section">BITSTRING OF 32 BIT COMMAND</div>
+      <div class="spec-body">
+        <div class="spec-row"><span class="spec-key">BSI</span><span class="spec-op">:=</span><span class="spec-val">32BS1[1..32]&lt;0..1&gt;</span></div>
+        <div class="spec-indent"><div class="spec-row"><span class="spec-key">bit1</span><span class="spec-op">=</span><span class="spec-val">LSB, bit32 = MSB</span></div></div>
+      </div>`
+  },
+  64: { enName: 'C_BO_TA_1 (64) - Bitstring 32bit + CP56Time2a', cnName: 'C_BO_TA_1 (64) - 32位串命令带时标', hasQds: false, left: `<div class="spec-section">BITSTRING 32 BIT WITH TIME TAG</div><div class="spec-body"><div class="spec-row"><span class="spec-key">BSI</span><span class="spec-op">:=</span><span class="spec-val">32BS1 + CP56Time2a</span></div></div>` },
+};
+
+// ─── Data Points ────────────────────────────────────────
+
+function renderDataPoints(id) {
+    const tbody = document.getElementById(`dpBody-${id}`);
+    if (!tbody) return;
+    // Don't re-render while user is editing a cell in this instance
+    if (editingCell && editingCell.id === id) return;
+    const s = getState(id);
+    let filtered = s.dataPoints;
+    if (s.activeFilter !== 'all') {
+        const types = s.activeFilter.split(',').map(Number);
+        filtered = filtered.filter(d => types.includes(d.typeId));
+    }
+    filtered.sort((a, b) => a.ioa - b.ioa);
+    let html = '';
+    for (const dp of filtered) {
+        const tn = dp.typeName || typeNames[dp.typeId] || `TYPE_${dp.typeId}`;
+        const detail = formatDetailFields(dp);
+        const qds = formatQDS(dp);
+        const time = dp.lastUpdate ? new Date(dp.lastUpdate).toLocaleString('zh-CN') : '-';
+        html += `<tr data-ioa="${dp.ioa}">
+            <td><b>${dp.ioa}</b></td>
+            <td>${dp.name || ''}</td>
+            <td><span class="mono" style="color:var(--accent)">${tn}</span></td>
+            <td id="val-${id}-${dp.ioa}">${detail}</td>
+            ${qds.hasQds ? `
+            <td class="qds-cell ${qds.ovBool ? 'qds-true' : 'qds-false'}" onclick="toggleQds('${id}',${dp.ioa},0x01)">${qds.ov}</td>
+            <td class="qds-cell ${qds.blBool ? 'qds-true' : 'qds-false'}" onclick="toggleQds('${id}',${dp.ioa},0x10)">${qds.bl}</td>
+            <td class="qds-cell ${qds.sbBool ? 'qds-true' : 'qds-false'}" onclick="toggleQds('${id}',${dp.ioa},0x20)">${qds.sb}</td>
+            <td class="qds-cell ${qds.ntBool ? 'qds-true' : 'qds-false'}" onclick="toggleQds('${id}',${dp.ioa},0x40)">${qds.nt}</td>
+            <td class="qds-cell ${qds.ivBool ? 'qds-true' : 'qds-false'}" onclick="toggleQds('${id}',${dp.ioa},0x80)">${qds.iv}</td>
+            ` : '<td></td><td></td><td></td><td></td><td></td>'}
+            <td style="color:var(--text2);text-align:center">${dp.groupId > 0 ? `<span style="background:#1a3c5c;color:#7ad;border-radius:3px;padding:1px 5px;font-size:11px">${dp.groupId}</span>` : '<span style="color:var(--text2);font-size:11px">—</span>'}</td>
+            <td style="color:var(--text2)">${time}</td>
+            <td>
+                <button class="inline-btn" onclick="startEdit('${id}',${dp.ioa})" title="修改值">✏️</button>
+                <button class="inline-btn" onclick="triggerSpontaneous('${id}',${dp.ioa})" title="发送自发">📡</button>
+                <button class="inline-btn" style="background:var(--red)" onclick="deleteDP('${id}',${dp.ioa})" title="删除">🗑️</button>
+            </td>
+        </tr>`;
+    }
+    tbody.innerHTML = html || '<tr><td colspan="12" style="text-align:center;padding:20px;color:var(--text2)">无数据点</td></tr>';
+}
+
+function formatQDS(dp) {
+    const q = dp.quality || 0;
+    if (dp.isCommand || dp.typeId === 21) return { hasQds: false };
+    const ovBool = !!(q & 0x01), blBool = !!(q & 0x10), sbBool = !!(q & 0x20), ntBool = !!(q & 0x40), ivBool = !!(q & 0x80);
+    return { ov: ovBool?'True':'False', ovBool, bl: blBool?'True':'False', blBool, sb: sbBool?'True':'False', sbBool, nt: ntBool?'True':'False', ntBool, iv: ivBool?'True':'False', ivBool, hasQds: true };
+}
+
+function formatDetailFields(dp) {
+    const tid = dp.typeId, v = dp.value, parts = [];
+    switch (tid) {
+        case 1: case 30: parts.push(fld('SPI', v ? '1 (ON)' : '0 (OFF)', v ? 'val-on' : 'val-off')); break;
+        case 3: case 31: { const m={0:'INDETERMINATE',1:'OFF',2:'ON',3:'INDETERMINATE'}; parts.push(fld('DPI',`${v} (${m[v]||'?'})`,v===2?'val-on':v===1?'val-off':'val-cmd')); break; }
+        case 5: case 32: { const vti=v&0x7F; parts.push(fld('VTI',`${vti>63?vti-128:vti}`,'val-num')); parts.push(fld('T',(v&0x80)?'True':'False',(v&0x80)?'qds-true':'qds-false')); break; }
+        case 7: case 33: parts.push(fld('BSI',(v>>>0).toString(2).padStart(32,'0'),'val-bsi')); break;
+        case 9: case 34: case 21: parts.push(fld('NVA',typeof v==='number'?v.toFixed(4):v,'val-num')); break;
+        case 11: case 35: parts.push(fld('SVA',Math.round(v),'val-num')); break;
+        case 13: case 36: parts.push(fld('Float',typeof v==='number'?v.toFixed(2):v,'val-num')); break;
+        case 15: case 37: parts.push(fld('BCR',Math.round(v),'val-num')); break;
+        case 20: { const stn=(v&0xFFFF).toString(2).padStart(16,'0'); const cdn=((v>>>16)&0xFFFF).toString(2).padStart(16,'0'); parts.push(fld('STn',stn,'val-bsi')); parts.push(fld('CDn',cdn,'val-bsi')); break; }
+        case 45: case 58: parts.push(fld('SCS',v?'1 (ON)':'0 (OFF)',v?'val-on':'val-off')); break;
+        case 46: case 59: { const m={0:'NOT_PERMITTED',1:'OFF',2:'ON',3:'NOT_PERMITTED'}; parts.push(fld('DCS',`${v} (${m[v]||'?'})`,'val-cmd')); break; }
+        case 47: case 60: { const m={0:'NOT_PERMITTED',1:'LOWER',2:'HIGHER',3:'NOT_PERMITTED'}; parts.push(fld('RCS',`${v} (${m[v]||'?'})`,'val-cmd')); break; }
+        case 48: case 61: parts.push(fld('NVA',typeof v==='number'?v.toFixed(4):v,'val-num')); break;
+        case 49: case 62: parts.push(fld('SVA',Math.round(v),'val-num')); break;
+        case 50: case 63: parts.push(fld('Float',typeof v==='number'?v.toFixed(2):v,'val-num')); break;
+        case 51: case 64: parts.push(fld('BSI','0x'+(v>>>0).toString(16).toUpperCase().padStart(8,'0'),'val-cmd')); break;
+        default: parts.push(fld('Raw',v,''));
+    }
+    return parts.join(' ');
+}
+
+function fld(label, value, cls) {
+    return `<span class="detail-field"><span class="detail-label">${label}:</span> <span class="${cls}">${value}</span></span>`;
+}
+
+// ─── Commands ───────────────────────────────────────────
+
+function renderCommands(id) {
+    const tbody = document.getElementById(`cmdBody-${id}`);
+    if (!tbody) return;
+    const s = getState(id);
+    let html = '';
+    for (const cmd of s.commandHistory) {
+        const time = new Date(cmd.time).toLocaleString('zh-CN', {year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',fractionalSecondDigits:3});
+        const statusCls = `cmd-${cmd.status}`;
+        const statusText = {selected:'已选择',executed:'已执行',cancelled:'已取消',timeout:'已超时'}[cmd.status]||cmd.status;
+        html += `<tr><td>${cmd.id}</td><td style="color:var(--text2)">${time}</td><td><b>${cmd.ioa}</b></td>
+            <td><span class="mono" style="color:var(--accent)">${cmd.typeName}</span></td>
+            <td class="val-cmd">${cmd.value}</td><td>${cmd.qu}</td>
+            <td>${cmd.isSelect?'<span style="color:var(--yellow)">SELECT</span>':'<span style="color:var(--green)">EXECUTE</span>'}</td>
+            <td>${cmd.cotName||''}</td><td><span class="cmd-status ${statusCls}">${statusText}</span></td>
+            <td>${cmd.connInfo||''}</td></tr>`;
+    }
+    tbody.innerHTML = html || '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text2)">暂无命令记录</td></tr>';
+}
+
+// ─── Comm Records ────────────────────────────────────────
+
+function escHtml(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function appendCommRecord(id, rec) {
+    const tbody = document.getElementById(`commBody-${id}`);
+    if (!tbody) return;
+    const isRx = rec.direction === 'rx';
+
+    // ── main row ──────────────────────────────────────────────
+    const tr = document.createElement('tr');
+    tr.className = isRx ? 'comm-rx' : 'comm-tx';
+    tr.style.cursor = rec.fullDecode ? 'pointer' : '';
+    const time = new Date(rec.time).toLocaleString('zh-CN', {year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',fractionalSecondDigits:3});
+    const dirLabel = isRx
+        ? '<span class="comm-dir-rx">← RX</span>'
+        : '<span class="comm-dir-tx">→ TX</span>';
+    const ioaStr = rec.ioa > 0 ? rec.ioa : '—';
+    const valStr = rec.value ? `<span class="comm-val">${escHtml(rec.value)}</span>` : '—';
+
+    // Enrich TypeName with TI number and element count
+    const typeColor = isRx ? 'var(--accent)' : 'var(--green)';
+    const tiSub = rec.typeId > 0
+        ? `<br><span class="mono" style="font-size:10px;color:var(--text2)">TI=${rec.typeId}${rec.numberOfElem > 0 ? ` num=${rec.numberOfElem}` : ''}${rec.isSeq ? ' SQ=1' : ''}</span>`
+        : '';
+    const typeCell = `<span class="mono" style="font-size:12px;color:${typeColor}">${escHtml(rec.typeName)}</span>${tiSub}`;
+
+    // Enrich COT with code number and Chinese name, plus PN/T flags
+    const COT_CN = {1:'周期',2:'背景扫描',3:'突发',4:'初始化',5:'请求',6:'激活',7:'激活确认',8:'停止激活',9:'停止激活确认',10:'激活结束',11:'远程返回',12:'本地返回',20:'总召唤响应',37:'电能量总召响应'};
+    const cotSub = rec.cotCode > 0
+        ? `<br><span class="mono" style="font-size:10px;color:var(--text2)">COT=${rec.cotCode}${COT_CN[rec.cotCode] ? ' ' + COT_CN[rec.cotCode] : ''}</span>`
+            + (rec.isNeg ? `<span style="font-size:10px;color:var(--red)"> PN=1</span>` : '')
+            + (rec.isTest ? `<span style="font-size:10px;color:var(--yellow)"> T=1</span>` : '')
+        : '';
+    const cotCell = `<span style="font-size:11px;color:var(--text2)">${escHtml(rec.cot)}</span>${cotSub}`;
+
+    // Detail with CA and OA if available
+    const caStr = rec.ca > 0 ? `<span style="font-size:10px;color:var(--text2)"> CA=${rec.ca}</span>` : '';
+    const oaStr = rec.oa > 0 ? `<span style="font-size:10px;color:var(--text2)"> OA=${rec.oa}</span>` : '';
+    const detailCell = `${escHtml(rec.detail)}${caStr}${oaStr}`;
+    const expandHint = rec.fullDecode ? `<span class="comm-arrow" style="font-size:10px;color:var(--text2);margin-left:6px">▶</span>` : '';
+
+    tr.innerHTML = `<td class="mono" style="color:var(--text2);font-size:11px">${time}</td><td>${dirLabel}</td>
+        <td>${typeCell}</td>
+        <td class="mono">${ioaStr}</td><td>${valStr}</td>
+        <td>${cotCell}</td>
+        <td style="color:var(--text1);font-size:12px">${detailCell}${expandHint}</td>
+        <td style="font-size:11px;color:var(--text2)">${escHtml(rec.connInfo||'')}</td>`;
+
+    // ── decode expand row ─────────────────────────────────────
+    let decTr = null;
+    if (rec.fullDecode) {
+        decTr = document.createElement('tr');
+        decTr.className = `comm-decode-row ${isRx ? 'comm-rx' : 'comm-tx'}`;
+        decTr.style.display = 'none';
+        decTr.innerHTML = `<td colspan="8">${escHtml(rec.fullDecode)}</td>`;
+        tr.onclick = () => {
+            const wasHidden = decTr.style.display === 'none';
+            decTr.style.display = wasHidden ? 'table-row' : 'none';
+            const arrow = tr.querySelector('.comm-arrow');
+            if (arrow) arrow.textContent = wasHidden ? '▼' : '▶';
+        };
+    }
+
+    // prepend decode row first so it sits visually below main row
+    if (decTr) tbody.prepend(decTr);
+    tbody.prepend(tr);
+
+    // Auto scroll to top (newest is at top)
+    const chk = document.getElementById(`commAutoScroll-${id}`);
+    if (chk && chk.checked) {
+        const wrap = document.getElementById(`commWrap-${id}`);
+        if (wrap) wrap.scrollTop = 0;
+    }
+    // Trim oldest rows (always from bottom; pairs: main+decode or single)
+    while (tbody.children.length > 1000) tbody.removeChild(tbody.lastChild);
+}
+
+function renderCommRecords(id) {
+    const tbody = document.getElementById(`commBody-${id}`);
+    if (!tbody) return;
+    // Already rendered incrementally via commRecord events — skip full rebuild
+    // to preserve any expanded decode rows. Only build when tbody is empty (initial load).
+    if (tbody.children.length > 0) return;
+    for (const rec of getState(id).commRecords) appendCommRecord(id, rec);
+}
+
+function clearCommRecords(id) {
+    getState(id).commRecords = [];
+    const tbody = document.getElementById(`commBody-${id}`);
+    if (tbody) tbody.innerHTML = '';
+    connection.invoke('ClearCommRecords', id).catch(() => {});
+}
+
+function clearCommands(id) {
+    getState(id).commandHistory = [];
+    const tbody = document.getElementById(`cmdBody-${id}`);
+    if (tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text2)">暂无命令记录</td></tr>';
+    connection.invoke('ClearCommandHistory', id).catch(() => {});
+}
+
+function clearLogs(id) {
+    getState(id).logEntries = [];
+    const wrap = document.getElementById(`logWrap-${id}`);
+    if (wrap) wrap.innerHTML = '';
+    connection.invoke('ClearLogs', id).catch(() => {});
+}
+
+// ─── Logs ───────────────────────────────────────────────
+
+function appendLog(id, entry) {
+    const wrap = document.getElementById(`logWrap-${id}`);
+    if (!wrap) return;
+    const div = document.createElement('div');
+    div.className = 'log-entry';
+    const time = new Date(entry.time).toLocaleString('zh-CN', {year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',fractionalSecondDigits:3});
+    const connBadge = entry.connInfo ? `<span class="log-conn" title="${entry.connInfo}">${entry.connInfo}</span>` : '';
+    div.innerHTML = `<span class="log-time">${time}</span><span class="log-type ${entry.type}">[${entry.type}]</span>${connBadge}<span class="log-msg">${entry.message}</span>`;
+    wrap.prepend(div);
+    while (wrap.children.length > 500) wrap.removeChild(wrap.lastChild);
+}
+
+function renderLogs(id) {
+    const wrap = document.getElementById(`logWrap-${id}`);
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    for (const entry of [...getState(id).logEntries].reverse()) appendLog(id, entry);
+}
+
+function renderConnBar(id) {
+    const bar = document.getElementById(`connBar-${id}`);
+    if (!bar) return;
+    const conns = getState(id).connections;
+    if (!conns || conns.length === 0) {
+        bar.style.borderLeft = '3px solid var(--red)';
+        bar.innerHTML = '<span style="color:var(--text2)">⚪ 无主站连接</span>';
+        return;
+    }
+    bar.style.borderLeft = '3px solid var(--green)';
+    const chips = conns.map(c => {
+        const state = c.active ? 'ACTIVE' : 'CONNECTED';
+        const color = c.active ? 'var(--green)' : '#aaa';
+        return `<div class="conn-chip" style="border:1px solid ${color}">`
+            + `<span class="dot ${c.active?'on':'off'}"></span>`
+            + `<span style="color:${color};font-weight:bold">${escHtml(c.remoteAddress||'')}</span>`
+            + ` <span style="color:var(--text2);font-size:10px">[${state}]</span></div>`;
+    }).join('');
+    bar.innerHTML = `<span style="color:var(--text2);margin-right:4px">已连接主站(${conns.length}):</span>` + chips;
+}
+
+// ─── Actions ────────────────────────────────────────────
+
+function toggleQds(id, ioa, bit) {
+    const dp = getState(id).dataPoints.find(d => d.ioa === ioa);
+    if (!dp) return;
+    connection.invoke("UpdateDataPoint", id, ioa, dp.value, (dp.quality||0) ^ bit);
+}
+
+// Track which cell is being edited to protect it from polling overrides
+let editingCell = null; // { id, ioa }
+
+function buildEditControl(dp, id, ioa) {
+    const t = dp.typeId;
+    const v = dp.value;
+    const confirmBtns = `<button class="inline-btn" onclick="saveEdit('${id}',${ioa})">✓</button>
+        <button class="inline-btn" style="background:var(--red)" onclick="cancelEdit('${id}',${ioa})">✗</button>`;
+    // Single command: 0=OFF 1=ON
+    if (t === 45 || t === 58)
+        return `<select class="inline-edit" id="edit-${id}-${ioa}"><option value="0"${v==0?' selected':''}>0 (OFF)</option><option value="1"${v==1?' selected':''}>1 (ON)</option></select>${confirmBtns}`;
+    // Double command: 1=OFF 2=ON
+    if (t === 46 || t === 59)
+        return `<select class="inline-edit" id="edit-${id}-${ioa}"><option value="1"${v==1?' selected':''}>1 (OFF)</option><option value="2"${v==2?' selected':''}>2 (ON)</option></select>${confirmBtns}`;
+    // Step command: 1=LOWER 2=HIGHER
+    if (t === 47 || t === 60)
+        return `<select class="inline-edit" id="edit-${id}-${ioa}"><option value="1"${v==1?' selected':''}>1 (LOWER↓)</option><option value="2"${v==2?' selected':''}>2 (HIGHER↑)</option></select>${confirmBtns}`;
+    // Single point: 0/1
+    if (t === 1 || t === 30)
+        return `<select class="inline-edit" id="edit-${id}-${ioa}"><option value="0"${v==0?' selected':''}>0 (OFF)</option><option value="1"${v==1?' selected':''}>1 (ON)</option></select>${confirmBtns}`;
+    // Double point: 0-3
+    if (t === 3 || t === 31)
+        return `<select class="inline-edit" id="edit-${id}-${ioa}"><option value="0"${v==0?' selected':''}>0 (不定)</option><option value="1"${v==1?' selected':''}>1 (OFF)</option><option value="2"${v==2?' selected':''}>2 (ON)</option><option value="3"${v==3?' selected':''}>3 (不定)</option></select>${confirmBtns}`;
+    // Default: number input
+    return `<input class="inline-edit" type="number" step="any" value="${v}" id="edit-${id}-${ioa}" onkeydown="if(event.key==='Enter')saveEdit('${id}',${ioa})">${confirmBtns}`;
+}
+
+function startEdit(id, ioa) {
+    const td = document.getElementById(`val-${id}-${ioa}`);
+    const dp = getState(id).dataPoints.find(d => d.ioa === ioa);
+    if (!dp || !td) return;
+    editingCell = { id, ioa };
+    td.innerHTML = buildEditControl(dp, id, ioa);
+    const el = document.getElementById(`edit-${id}-${ioa}`);
+    if (el) el.focus();
+}
+
+function cancelEdit(id, ioa) {
+    editingCell = null;
+    renderDataPoints(id);
+}
+
+function saveEdit(id, ioa) {
+    const input = document.getElementById(`edit-${id}-${ioa}`);
+    if (!input) return;
+    const val = parseFloat(input.value);
+    if (isNaN(val)) return;
+    const dp = getState(id).dataPoints.find(d => d.ioa === ioa);
+    editingCell = null; // clear BEFORE renderDataPoints so the next render proceeds
+    connection.invoke("UpdateDataPoint", id, ioa, val, dp ? dp.quality || 0 : 0);
+    renderDataPoints(id);
+}
+
+function triggerSpontaneous(id, ioa) { connection.invoke("TriggerSpontaneous", id, ioa); }
+
+function deleteDP(id, ioa) {
+    if (!confirm(`确认删除 IOA=${ioa} ?`)) return;
+    connection.invoke("DeleteDataPoint", id, ioa);
+}
+
+function showAddModal() { document.getElementById('addModal').classList.add('show'); }
+function hideAddModal() { document.getElementById('addModal').classList.remove('show'); }
+function doAddDataPoint() {
+    if (!activeInstanceId) { alert('请先选择一个实例'); return; }
+    const ioa = parseInt(document.getElementById('addIoa').value);
+    const typeId = parseInt(document.getElementById('addTypeId').value);
+    const name = document.getElementById('addName').value;
+    const value = parseFloat(document.getElementById('addValue').value) || 0;
+    const groupId = parseInt(document.getElementById('addGroupId').value) || 0;
+    if (isNaN(ioa) || ioa < 0) { alert('请输入有效的IOA'); return; }
+    connection.invoke("AddDataPoint", activeInstanceId, ioa, typeId, name, value, groupId);
+    hideAddModal();
+}
+
+// ─── Pending Command Toasts ─────────────────────────────
+
+const _pendingTimers = {};
+
+function getCmdCategoryName(typeId) {
+    const t = typeId;
+    if (t===45||t===58) return '单点遥控';
+    if (t===46||t===59) return '双点遥控';
+    if (t===47||t===60) return '步调节命令';
+    if (t===48||t===61) return '设定归一化值';
+    if (t===49||t===62) return '设定标度化值';
+    if (t===50||t===63) return '设定浮点值';
+    if (t===51||t===64) return '32位串命令';
+    return '遥控命令';
+}
+
+function showPendingToast(instanceId, cmd) {
+    const container = document.getElementById('pendingContainer');
+    const inst = instances.find(i => i.id === instanceId);
+    const instLabel = inst ? `Port:${inst.port}` : instanceId;
+    const caLabel   = inst ? inst.commonAddress : '?';
+    const isSelect  = cmd.isSelect;
+    const catName   = getCmdCategoryName(cmd.typeId);
+    const opText    = isSelect ? '返校' : '执行';
+    const titleText = isSelect ? '从站遥控返校确认' : '从站遥控执行确认';
+    const question  = isSelect
+        ? `是否确认【${catName}】选择返校？`
+        : `是否执行【${catName}】遥控命令？`;
+    const valStr    = formatCmdValue(cmd);
+    const opMark    = isSelect ? '⬛ SELECT' : '⚡ EXECUTE';
+
+    const div = document.createElement('div');
+    div.className = 'rc-dialog';
+    div.id = `pt-${cmd.pendingId}`;
+    div.innerHTML = `
+      <div class="rc-titlebar">
+        <span class="rc-ttl">⚠️ ${titleText}</span>
+        <span class="rc-timer" id="timer-${cmd.pendingId}">30s</span>
+      </div>
+      <div class="rc-content">
+        <div class="rc-question">${question}</div>
+        <div class="rc-fields">
+          <div class="rc-field"><span class="rfl">命令类型:</span><span class="rfv hi">${escHtml(cmd.typeName)} (${cmd.typeId}) &ndash; ${catName}</span></div>
+          <div class="rc-field"><span class="rfl">操作:</span><span class="rfv">${opMark}</span></div>
+          <div class="rc-field"><span class="rfl">公共地址:</span><span class="rfv">${caLabel}</span></div>
+          <div class="rc-field"><span class="rfl">信息地址:</span><span class="rfv hi">${cmd.ioa}</span></div>
+          <div class="rc-field"><span class="rfl">遥控值:</span><span class="rfv hi">${escHtml(valStr)}</span></div>
+          <div class="rc-field"><span class="rfl">限定词QU:</span><span class="rfv">${cmd.qu}</span></div>
+          <div class="rc-field"><span class="rfl">来源主站:</span><span class="rfv">${escHtml(cmd.connInfo||'-')}</span></div>
+          <div class="rc-field"><span class="rfl">从站实例:</span><span class="rfv">${instLabel} CA:${caLabel}</span></div>
+        </div>
+      </div>
+      <div class="rc-footbar">
+        <button class="rc-btn-no" onclick="respondCmd('${instanceId}','${cmd.pendingId}',false)">${opText}取消</button>
+        <button class="rc-btn-ok" onclick="respondCmd('${instanceId}','${cmd.pendingId}',true)">${opText}确认</button>
+      </div>`;
+    container.appendChild(div);
+    container.classList.add('active');
+
+    let remaining = 30;
+    _pendingTimers[cmd.pendingId] = setInterval(() => {
+        remaining--;
+        const el = document.getElementById(`timer-${cmd.pendingId}`);
+        if (el) {
+            el.textContent = `${remaining}s`;
+            if (remaining <= 10) el.style.color = 'var(--red)';
+        }
+        if (remaining <= 0) removePendingToast(cmd.pendingId);
+    }, 1000);
+}
+
+function removePendingToast(pendingId) {
+    clearInterval(_pendingTimers[pendingId]);
+    delete _pendingTimers[pendingId];
+    const el = document.getElementById(`pt-${pendingId}`);
+    if (el) el.remove();
+    const container = document.getElementById('pendingContainer');
+    if (!container.querySelector('.rc-dialog')) container.classList.remove('active');
+}
+
+function respondCmd(instanceId, pendingId, accept) {
+    removePendingToast(pendingId);
+    connection.invoke("RespondCommand", instanceId, pendingId, accept)
+        .catch(err => console.error('RespondCommand failed:', err));
+}
+
+function formatCmdValue(cmd) {
+    const tid = cmd.typeId;
+    const v = cmd.value;
+    if (tid === 45 || tid === 58) return v ? '1 (ON)' : '0 (OFF)';
+    if (tid === 46 || tid === 59) return ['不定', 'OFF', 'ON', '不定'][v] || v;
+    if (tid === 47 || tid === 60) return ['不允许', 'LOWER↓', 'HIGHER↑', '不允许'][v] || v;
+    if (tid === 51 || tid === 64) return '0x' + (v >>> 0).toString(16).toUpperCase().padStart(8, '0');
+    return typeof v === 'number' && v % 1 !== 0 ? v.toFixed(4) : v;
+}
+
+// ─── Protocol Reference ─────────────────────────────────
+
+function getProtocolRefHTML() {
+    return `
+    <h3>监视方向 TypeID</h3>
+    <table>
+      <tr><td class="mono">M_SP_NA_1 (1)</td><td>单点信息</td><td>SIQ = SPI + IV + NT + SB + BL</td></tr>
+      <tr><td class="mono">M_SP_TB_1 (30)</td><td>单点信息 带CP56Time2a</td><td>SIQ + 7字节时标</td></tr>
+      <tr><td class="mono">M_DP_NA_1 (3)</td><td>双点信息</td><td>DIQ = DPI(2bit) + IV + NT + SB + BL</td></tr>
+      <tr><td class="mono">M_DP_TB_1 (31)</td><td>双点信息 带CP56Time2a</td><td>DIQ + 7字节时标</td></tr>
+      <tr><td class="mono">M_ST_NA_1 (5)</td><td>步位置信息</td><td>VTI(7bit+transient) + QDS</td></tr>
+      <tr><td class="mono">M_BO_NA_1 (7)</td><td>32位串</td><td>BSI(32bit) + QDS</td></tr>
+      <tr><td class="mono">M_ME_NA_1 (9)</td><td>归一化测量值</td><td>NVA(16bit, -1~+1) + QDS</td></tr>
+      <tr><td class="mono">M_ME_NB_1 (11)</td><td>标度化测量值</td><td>SVA(16bit int) + QDS</td></tr>
+      <tr><td class="mono">M_ME_NC_1 (13)</td><td>短浮点测量值</td><td>IEEE 754 float + QDS</td></tr>
+      <tr><td class="mono">M_IT_NA_1 (15)</td><td>累计量</td><td>BCR(32bit counter)</td></tr>
+      <tr><td class="mono">M_PS_NA_1 (20)</td><td>带变位检出的成组单点</td><td>SPI(16bit) + SCD(16bit) + QDS</td></tr>
+      <tr><td class="mono">M_ME_ND_1 (21)</td><td>不带品质的归一化值</td><td>NVA only</td></tr>
+    </table>
+    <h3>控制方向 TypeID</h3>
+    <table>
+      <tr><td class="mono">C_SC_NA_1 (45)</td><td>单点命令</td><td>SCO = SCS + QU + S/E</td></tr>
+      <tr><td class="mono">C_DC_NA_1 (46)</td><td>双点命令</td><td>DCO = DCS + QU + S/E</td></tr>
+      <tr><td class="mono">C_RC_NA_1 (47)</td><td>步调节命令</td><td>RCO = RCS + QU + S/E</td></tr>
+      <tr><td class="mono">C_SE_NA_1 (48)</td><td>设定归一化值</td><td>NVA + QOS</td></tr>
+      <tr><td class="mono">C_SE_NB_1 (49)</td><td>设定标度值</td><td>SVA + QOS</td></tr>
+      <tr><td class="mono">C_SE_NC_1 (50)</td><td>设定短浮点值</td><td>float + QOS</td></tr>
+      <tr><td class="mono">C_BO_NA_1 (51)</td><td>32位串命令</td><td>BSI(32bit)</td></tr>
+    </table>
+    <h3>SBO 流程</h3>
+    <table>
+      <tr><td>1. SELECT</td><td class="mono">COT=6 + S/E=1</td></tr>
+      <tr><td>2. ACT_CON</td><td class="mono">COT=7 + S/E=1</td></tr>
+      <tr><td>3. EXECUTE</td><td class="mono">COT=6 + S/E=0</td></tr>
+      <tr><td>4. ACT_CON</td><td class="mono">COT=7 + S/E=0</td></tr>
+      <tr><td>5. ACT_TERM</td><td class="mono">COT=10</td></tr>
+      <tr><td colspan="2" style="color:var(--red)">取消: COT=8 → COT=9 (DEACT_CON)</td></tr>
+    </table>`;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            ext: zip
+          - os: ubuntu-latest
+            rid: linux-x64
+            ext: tar.gz
+          - os: macos-13
+            rid: osx-x64
+            ext: tar.gz
+          - os: macos-latest
+            rid: osx-arm64
+            ext: tar.gz
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish
+        run: >
+          dotnet publish IEC104Simulator/IEC104Simulator.csproj
+          -c Release
+          -r ${{ matrix.rid }}
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -o ./publish
+
+      - name: Package (Windows)
+        if: matrix.rid == 'win-x64'
+        shell: pwsh
+        run: Compress-Archive -Path ./publish/* -DestinationPath IEC104Simulator-${{ github.ref_name }}-${{ matrix.rid }}.zip
+
+      - name: Package (Linux / macOS)
+        if: matrix.rid != 'win-x64'
+        run: tar -czf IEC104Simulator-${{ github.ref_name }}-${{ matrix.rid }}.tar.gz -C ./publish .
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: IEC104Simulator-${{ github.ref_name }}-${{ matrix.rid }}.${{ matrix.ext }}
+          generate_release_notes: true

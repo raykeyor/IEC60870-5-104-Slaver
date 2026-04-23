@@ -1,0 +1,44 @@
+# ─── Build outputs ─────────────────────────────────────────────────────────
+[Bb]in/
+[Oo]bj/
+out/
+
+# ─── Visual Studio / Rider ─────────────────────────────────────────────────
+.vs/
+*.user
+*.suo
+*.userprefs
+*.DotSettings.user
+.idea/
+
+# ─── NuGet ─────────────────────────────────────────────────────────────────
+*.nupkg
+*.snupkg
+project.lock.json
+packages/
+!**/packages/repositories.config
+
+# ─── Certificates & private keys (never commit) ────────────────────────────
+*.pfx
+*.p12
+*.key
+*.pem
+*.cer
+*.crt
+certs/
+
+# ─── Debug / runtime logs ──────────────────────────────────────────────────
+debug_logs/
+*.log
+logs/
+
+# ─── Development artifacts ─────────────────────────────────────────────────
+api_output.txt
+
+# ─── OS generated ──────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── dotnet publish output ─────────────────────────────────────────────────
+publish/

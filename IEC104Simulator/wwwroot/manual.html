@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IEC 60870-5-104 Slave Simulator — 产品说明书</title>
+<style>
+:root {
+  --bg: #ffffff; --bg2: #f8f9fb; --bg3: #eef0f5;
+  --text: #1e2333; --text2: #4b5578; --accent: #2563eb;
+  --accent2: #1d4ed8; --green: #16a34a; --red: #dc2626;
+  --orange: #ea580c; --border: #d1d5e0; --code-bg: #1e2333;
+  --code-text: #cdd6f4;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI','Microsoft YaHei',sans-serif; background:var(--bg); color:var(--text); font-size:14px; line-height:1.7; }
+
+/* Layout */
+.container { display:grid; grid-template-columns:260px 1fr; min-height:100vh; }
+.sidebar { background:var(--bg2); border-right:1px solid var(--border); padding:24px 0; position:sticky; top:0; height:100vh; overflow-y:auto; font-size:13px; }
+.content { padding:40px 60px 80px; max-width:960px; }
+
+/* Sidebar nav */
+.sidebar .logo { padding:0 20px 20px; border-bottom:1px solid var(--border); margin-bottom:16px; }
+.sidebar .logo h2 { font-size:14px; color:var(--accent); font-weight:700; line-height:1.4; }
+.sidebar .logo small { color:var(--text2); font-size:11px; }
+.nav-section { padding:4px 20px 2px; font-size:11px; color:#9ca3b8; font-weight:700; letter-spacing:.8px; text-transform:uppercase; margin-top:12px; }
+.nav-item { display:block; padding:5px 20px 5px 28px; color:var(--text2); text-decoration:none; border-left:2px solid transparent; transition:all .15s; }
+.nav-item:hover { color:var(--accent); background:var(--bg3); }
+.nav-item.active { color:var(--accent); border-left-color:var(--accent); background:var(--bg3); font-weight:600; }
+.nav-sub { padding-left:40px; font-size:12px; }
+
+/* Content typography */
+h1 { font-size:28px; font-weight:800; color:var(--text); margin-bottom:8px; }
+h1 small { font-size:14px; font-weight:400; color:var(--text2); display:block; margin-top:4px; }
+h2 { font-size:20px; font-weight:700; color:var(--text); margin:40px 0 14px; padding-top:16px; border-top:2px solid var(--border); }
+h2:first-of-type { border-top:none; margin-top:20px; }
+h3 { font-size:16px; font-weight:700; color:var(--accent2); margin:24px 0 10px; }
+h4 { font-size:14px; font-weight:700; color:var(--text); margin:16px 0 6px; }
+p { margin-bottom:12px; color:var(--text2); }
+strong { color:var(--text); }
+ul, ol { margin:8px 0 14px 20px; }
+li { margin-bottom:5px; color:var(--text2); }
+li strong { color:var(--text); }
+a { color:var(--accent); text-decoration:none; }
+
+/* Title card */
+.title-card { background:linear-gradient(135deg,#1e3a6e,#2563eb); border-radius:10px; padding:32px 36px; margin-bottom:32px; color:#fff; }
+.title-card h1 { color:#fff; font-size:26px; }
+.title-card h1 small { color:rgba(255,255,255,.75); }
+.title-card .meta { display:flex; gap:24px; margin-top:16px; flex-wrap:wrap; }
+.title-card .meta-item { display:flex; flex-direction:column; }
+.title-card .meta-item .label { font-size:11px; color:rgba(255,255,255,.6); text-transform:uppercase; letter-spacing:.6px; }
+.title-card .meta-item .value { font-size:13px; color:#fff; font-weight:600; margin-top:2px; }
+
+/* Tables */
+table { width:100%; border-collapse:collapse; margin:12px 0 20px; font-size:13px; }
+thead th { background:var(--bg3); padding:8px 12px; text-align:left; border:1px solid var(--border); font-weight:700; color:var(--text); white-space:nowrap; }
+td { padding:7px 12px; border:1px solid var(--border); vertical-align:top; color:var(--text2); }
+tr:nth-child(even) td { background:var(--bg2); }
+.td-code { font-family:'Cascadia Code','Consolas',monospace; font-size:12px; color:#2563eb; white-space:nowrap; }
+.td-center { text-align:center; }
+.badge { display:inline-block; padding:1px 7px; border-radius:10px; font-size:11px; font-weight:600; }
+.badge-green { background:#dcfce7; color:#15803d; }
+.badge-blue  { background:#dbeafe; color:#1d4ed8; }
+.badge-orange{ background:#ffedd5; color:#c2410c; }
+.badge-gray  { background:#f1f5f9; color:#475569; }
+.badge-red   { background:#fee2e2; color:#b91c1c; }
+
+/* Code blocks */
+code { font-family:'Cascadia Code','Consolas',monospace; background:var(--bg3); padding:1px 5px; border-radius:3px; font-size:12px; color:#1d4ed8; }
+pre { background:var(--code-bg); color:var(--code-text); padding:16px 20px; border-radius:8px; overflow-x:auto; font-family:'Cascadia Code','Consolas',monospace; font-size:12px; line-height:1.8; margin:12px 0 20px; }
+pre .c  { color:#6a9955; } /* comment */
+pre .k  { color:#569cd6; } /* keyword */
+pre .s  { color:#ce9178; } /* string */
+pre .n  { color:#9cdcfe; } /* name */
+pre .v  { color:#b5cea8; } /* value */
+
+/* Info boxes */
+.box { border-radius:8px; padding:14px 18px; margin:16px 0; font-size:13px; }
+.box-info  { background:#eff6ff; border-left:4px solid #2563eb; }
+.box-warn  { background:#fffbeb; border-left:4px solid #f59e0b; }
+.box-tip   { background:#f0fdf4; border-left:4px solid #16a34a; }
+.box-danger{ background:#fef2f2; border-left:4px solid #dc2626; }
+.box p { margin:0; color:inherit; }
+.box p + p { margin-top:6px; }
+.box strong { color:var(--text); }
+
+/* Section divider */
+.section { scroll-margin-top:24px; }
+
+/* Feature grid */
+.feat-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin:16px 0 24px; }
+.feat-card { background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:16px; }
+.feat-card .icon { font-size:22px; margin-bottom:8px; }
+.feat-card h4 { font-size:13px; color:var(--accent2); margin:0 0 6px; }
+.feat-card p { font-size:12px; margin:0; }
+
+/* Step list */
+.steps { counter-reset:step; margin:16px 0; }
+.step { display:flex; gap:14px; margin-bottom:16px; }
+.step-num { background:var(--accent); color:#fff; border-radius:50%; width:26px; height:26px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; margin-top:1px; }
+.step-body h4 { margin:0 0 4px; font-size:14px; }
+.step-body p  { margin:0; }
+
+/* Flow diagram */
+.flow { display:flex; gap:0; align-items:stretch; margin:14px 0 20px; flex-wrap:wrap; }
+.flow-box { background:var(--bg3); border:1px solid var(--border); border-radius:6px; padding:8px 14px; text-align:center; font-size:12px; font-weight:600; flex-shrink:0; }
+.flow-box.tx  { background:#dbeafe; border-color:#93c5fd; color:#1d4ed8; }
+.flow-box.rx  { background:#dcfce7; border-color:#86efac; color:#15803d; }
+.flow-box.sys { background:#fef3c7; border-color:#fcd34d; color:#92400e; }
+.flow-arrow { display:flex; align-items:center; padding:0 6px; color:var(--text2); font-size:16px; }
+
+/* TOC */
+.toc { background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:16px 20px; margin-bottom:30px; }
+.toc h3 { font-size:13px; color:var(--text2); margin:0 0 10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; }
+.toc ol { margin:0 0 0 18px; }
+.toc li { font-size:13px; margin-bottom:3px; }
+
+/* Print */
+@media print {
+  .sidebar { display:none; }
+  .content { max-width:100%; padding:20px; }
+  .title-card { background:#1e3a6e !important; -webkit-print-color-adjust:exact; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<!-- Sidebar Navigation -->
+<nav class="sidebar">
+  <div class="logo">
+    <h2>IEC 60870-5-104<br>Slave Simulator</h2>
+    <small>v1.0 产品说明书</small>
+  </div>
+  <span class="nav-section">概述</span>
+  <a class="nav-item" href="#overview">产品简介</a>
+  <a class="nav-item" href="#features">功能特性</a>
+  <a class="nav-item" href="#tech">技术规格</a>
+  <span class="nav-section">快速开始</span>
+  <a class="nav-item" href="#deploy">部署与启动</a>
+  <a class="nav-item" href="#first-use">首次使用</a>
+  <span class="nav-section">界面操作</span>
+  <a class="nav-item" href="#ui-overview">界面总览</a>
+  <a class="nav-item" href="#instances">实例管理</a>
+  <a class="nav-item" href="#datapoints">数据点管理</a>
+  <a class="nav-item" href="#quality">品质标志操作</a>
+  <a class="nav-item" href="#commands">遥控命令处理</a>
+  <a class="nav-item" href="#comm">通信记录</a>
+  <a class="nav-item" href="#logs">事件日志</a>
+  <span class="nav-section">协议详解</span>
+  <a class="nav-item" href="#iec104-apci">APCI 传输层</a>
+  <a class="nav-item" href="#monitor-types">监视方向类型</a>
+  <a class="nav-item" href="#control-types">控制方向类型</a>
+  <a class="nav-item" href="#interrogation">召唤机制</a>
+  <a class="nav-item" href="#sbo">SBO选择执行流程</a>
+  <a class="nav-item" href="#system-cmds">系统命令</a>
+  <span class="nav-section">高级功能</span>
+  <a class="nav-item" href="#tls">TLS 加密通信</a>
+  <a class="nav-item" href="#periodic">周期背景扫描</a>
+  <a class="nav-item" href="#apci-config">APCI 参数配置</a>
+  <a class="nav-item" href="#groups">数据分组</a>
+  <a class="nav-item" href="#rest-api">REST API</a>
+</nav>
+
+<!-- Main Content -->
+<main class="content">
+
+<!-- Title Card -->
+<div class="title-card">
+  <h1>IEC 60870-5-104 Slave Simulator
+    <small>从站模拟器 — 完整协议合规版</small>
+  </h1>
+  <div class="meta">
+    <div class="meta-item"><span class="label">版本</span><span class="value">v1.0</span></div>
+    <div class="meta-item"><span class="label">协议标准</span><span class="value">IEC 60870-5-104</span></div>
+    <div class="meta-item"><span class="label">运行时</span><span class="value">ASP.NET Core .NET 8</span></div>
+    <div class="meta-item"><span class="label">协议库</span><span class="value">lib60870.NET v2.3.0</span></div>
+    <div class="meta-item"><span class="label">默认端口</span><span class="value">Web UI: 5010 | IEC104: 2404</span></div>
+    <div class="meta-item"><span class="label">文档日期</span><span class="value">2026-04-13</span></div>
+  </div>
+</div>
+
+<!-- ─── 1. 产品简介 ─── -->
+<section id="overview" class="section">
+<h2>1. 产品简介</h2>
+
+<p>
+  <strong>IEC 60870-5-104 Slave Simulator</strong> 是一款基于 ASP.NET Core .NET 8 开发的工业级
+  IEC 60870-5-104（IEC 104）从站仿真工具，完整实现了 IEC 104 协议规范的从站（Slave/Server）侧逻辑，
+  可用于主站软件的调试、验收测试、协议一致性测试及教学演示。
+</p>
+<p>
+  系统通过嵌入式 Web 服务器对外提供全功能浏览器操作界面，无需安装任何客户端软件，
+  支持在同一进程内并发运行多个独立的从站实例（不同端口/CA），并可通过 Web UI 对每个实例的数据点、
+  品质、连接状态、通信记录进行实时监控与交互。
+</p>
+
+<div class="box box-info">
+  <p><strong>协议合规声明：</strong>本产品在以下方面严格遵循 IEC 60870-5-104 标准：
+  连接建立与保持（STARTDT/STOPDT/TESTFR）、初始化流程（M_EI_NA_1）、全站及分组召唤（C_IC_NA_1）、
+  电能量召唤（C_CI_NA_1）、时钟同步（C_CS_NA_1）、所有监视方向数据类型（TI=1~37）、
+  所有控制方向命令类型（TI=45~64）、完整 SBO 选择执行/取消流程、品质描述词（QDS）全部 5 位（OV/BL/SB/NT/IV）。</p>
+</div>
+
+<h3>适用场景</h3>
+<ul>
+  <li><strong>主站软件开发调试：</strong>为 SCADA/EMS/DMS 开发团队提供完整可控的 IEC 104 从站端点</li>
+  <li><strong>协议一致性验证：</strong>测试主站对各类数据类型、品质位、SBO 流程、召唤机制的处理能力</li>
+  <li><strong>系统集成测试：</strong>在实际设备不可用时，模拟真实RTU/PLC的行为</li>
+  <li><strong>协议培训教学：</strong>通过可视化通信记录深入理解 IEC 104 协议帧结构</li>
+  <li><strong>TLS 安全测试：</strong>验证主站对加密通信的支持能力</li>
+</ul>
+</section>
+
+<!-- ─── 2. 功能特性 ─── -->
+<section id="features" class="section">
+<h2>2. 功能特性</h2>
+
+<div class="feat-grid">
+  <div class="feat-card"><div class="icon">🏭</div><h4>多实例并发</h4><p>同一进程内运行多个独立从站，各占不同端口和公共地址（CA）</p></div>
+  <div class="feat-card"><div class="icon">📊</div><h4>全类型数据点</h4><p>支持 IEC 104 全部监视方向类型（TI 1~37，含带/不带时标系列）</p></div>
+  <div class="feat-card"><div class="icon">⚙️</div><h4>全类型遥控命令</h4><p>支持全部控制方向类型（TI 45~64），含完整 SBO 选择执行流程</p></div>
+  <div class="feat-card"><div class="icon">📡</div><h4>实时通信记录</h4><p>每帧 ASDU 完整解析显示，含 TI/VSQ/COT/CA/IOA/数值/PN/T 字段</p></div>
+  <div class="feat-card"><div class="icon">🔒</div><h4>TLS 加密通信</h4><p>支持 PKCS12 证书，可验证主站客户端证书，完全符合 IEC 104 TLS 规范</p></div>
+  <div class="feat-card"><div class="icon">🕐</div><h4>时钟同步</h4><p>接收并处理 C_CS_NA_1，自动计算主从时钟偏差并应用于 TB 类型时标</p></div>
+  <div class="feat-card"><div class="icon">🔁</div><h4>周期背景扫描</h4><p>可配置间隔（秒）定时上送所有监视量，COT=2，有效防止主站断连</p></div>
+  <div class="feat-card"><div class="icon">📋</div><h4>分组召唤</h4><p>数据点支持分配 GroupId（1-16），响应 QOI=21~36 分组召唤请求</p></div>
+  <div class="feat-card"><div class="icon">⚡</div><h4>脉冲命令</h4><p>自动处理 QU=1（短脉冲 200ms）和 QU=2（长脉冲 2000ms）自动复位</p></div>
+  <div class="feat-card"><div class="icon">🌐</div><h4>浏览器操作界面</h4><p>无需安装客户端，任意浏览器访问 http://localhost:5010 即可操作</p></div>
+  <div class="feat-card"><div class="icon">🔔</div><h4>遥控返校确认</h4><p>遥控命令触发弹窗确认，30秒倒计时，支持 SBO 和直接执行两种模式</p></div>
+  <div class="feat-card"><div class="icon">🔧</div><h4>APCI 参数配置</h4><p>K/W/T0/T1/T2/T3 全部可配置，默认值完全符合 IEC 104 标准</p></div>
+</div>
+</section>
+
+<!-- ─── 3. 技术规格 ─── -->
+<section id="tech" class="section">
+<h2>3. 技术规格</h2>
+
+<h3>运行环境</h3>
+<table>
+  <thead><tr><th>项目</th><th>要求</th></tr></thead>
+  <tbody>
+    <tr><td>操作系统</td><td>Windows 10/11、Windows Server 2019+、Linux（Ubuntu 20.04+）、macOS 12+</td></tr>
+    <tr><td>运行时</td><td>.NET 8 Runtime（含 ASP.NET Core Runtime）</td></tr>
+    <tr><td>浏览器</td><td>Chrome 90+、Edge 90+、Firefox 90+（需支持 WebSocket）</td></tr>
+    <tr><td>内存</td><td>最低 128MB；建议 256MB+（每实例约额外 10MB）</td></tr>
+    <tr><td>网络</td><td>TCP/IP，默认监听 0.0.0.0（所有网卡）</td></tr>
+  </tbody>
+</table>
+
+<h3>协议参数</h3>
+<table>
+  <thead><tr><th>参数</th><th>默认值</th><th>范围</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td class="td-code">IEC 104 端口</td><td>2404</td><td>1–65535</td><td>TCP 监听端口（IEC 104 标准端口为 2404）</td></tr>
+    <tr><td class="td-code">公共地址 CA</td><td>1</td><td>0–65534</td><td>站地址，与主站配置一致</td></tr>
+    <tr><td class="td-code">k（发送窗口）</td><td>12</td><td>1–32767</td><td>最大未确认 I 帧数</td></tr>
+    <tr><td class="td-code">w（确认窗口）</td><td>8</td><td>1–32767</td><td>累计 w 帧后回送确认</td></tr>
+    <tr><td class="td-code">T0（连接超时）</td><td>10s</td><td>1–255s</td><td>STARTDT 确认等待超时</td></tr>
+    <tr><td class="td-code">T1（发送超时）</td><td>15s</td><td>1–255s</td><td>I/U 帧未确认超时，超时则断开</td></tr>
+    <tr><td class="td-code">T2（确认超时）</td><td>10s</td><td>1–255s</td><td>收到 I 帧后最迟回确认延时</td></tr>
+    <tr><td class="td-code">T3（测试帧间隔）</td><td>20s</td><td>1–255s</td><td>空闲超过 T3 则发送 TESTFR 探测</td></tr>
+    <tr><td class="td-code">IOA 长度</td><td>3字节</td><td>—</td><td>信息对象地址范围 0–16777215</td></tr>
+    <tr><td class="td-code">CA 长度</td><td>2字节</td><td>—</td><td>公共地址范围 0–65534</td></tr>
+  </tbody>
+</table>
+
+<h3>容量限制</h3>
+<table>
+  <thead><tr><th>项目</th><th>限制</th></tr></thead>
+  <tbody>
+    <tr><td>每实例最大日志条目</td><td>500 条（FIFO 淘汰）</td></tr>
+    <tr><td>每实例最大命令历史</td><td>200 条</td></tr>
+    <tr><td>每实例最大通信记录</td><td>500 条</td></tr>
+    <tr><td>服务端发送队列</td><td>200 帧（lib60870.NET MaxQueueSize）</td></tr>
+    <tr><td>SBO 选择超时</td><td>60 秒后自动失效</td></tr>
+    <tr><td>命令用户确认超时</td><td>30 秒后自动拒绝</td></tr>
+  </tbody>
+</table>
+</section>
+
+<!-- ─── 4. 部署与启动 ─── -->
+<section id="deploy" class="section">
+<h2>4. 部署与启动</h2>
+
+<h3>4.1 直接运行</h3>
+<p>确保已安装 .NET 8 Runtime，在项目目录执行：</p>
+<pre>
+<span class="c"># 切换到项目目录</span>
+cd d:\TestResearch\iec04\IEC104Simulator
+
+<span class="c"># 开发模式运行</span>
+dotnet run
+
+<span class="c"># Release 模式（推荐）</span>
+dotnet run -c Release
+</pre>
+
+<h3>4.2 发布为独立可执行文件</h3>
+<pre>
+<span class="c"># 发布到 publish 目录</span>
+dotnet publish -c Release -o publish --self-contained false
+
+<span class="c"># 运行发布版本</span>
+.\publish\IEC104Simulator.exe
+</pre>
+
+<h3>4.3 访问 Web UI</h3>
+<p>启动后打开浏览器访问：</p>
+<pre>http://localhost:5010</pre>
+<p>程序启动时会自动创建一个端口 <strong>2404</strong>、公共地址 <strong>1</strong> 的默认从站实例并立即启动监听。</p>
+
+<div class="box box-warn">
+  <p><strong>防火墙注意：</strong>如需从其他主机连接，请确保 Windows 防火墙允许 TCP 入站端口 2404（或其他自定义端口）。
+  Web UI 端口 5010 通常只需本地访问。</p>
+</div>
+
+<h3>4.4 配置监听接口</h3>
+<p>默认 Web UI 监听 <code>0.0.0.0:5010</code>（所有网卡），IEC 104 从站也监听 <code>0.0.0.0:&lt;Port&gt;</code>。
+如需指定端口，可在 <code>Program.cs</code> 最后一行修改 <code>app.Run("http://0.0.0.0:5010")</code>。</p>
+</section>
+
+<!-- ─── 5. 首次使用 ─── -->
+<section id="first-use" class="section">
+<h2>5. 首次使用</h2>
+
+<div class="steps">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <h4>启动程序并打开浏览器</h4>
+      <p>运行 <code>dotnet run -c Release</code>，打开浏览器访问 <code>http://localhost:5010</code>。
+      顶部状态栏显示 <strong style="color:#16a34a">● SignalR 已连接</strong> 表示 Web 通道正常。</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <h4>确认默认实例已运行</h4>
+      <p>页面顶部的实例标签页中会看到 <code>Port:2404 CA:1</code>，绿色圆点表示已在监听。
+      点击该标签进入实例面板。</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <h4>让主站连接</h4>
+      <p>在主站软件（SCADA/测试工具）中配置目标 IP 为本机地址、端口 2404、CA=1，
+      建立 TCP 连接后发送 STARTDT_ACT，从站将回 STARTDT_CON 并发送 <code>M_EI_NA_1</code> 初始化结束帧。</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <h4>观察连接与通信</h4>
+      <p>连接栏会显示主站 IP 地址，通信记录标签页会实时展示每条 ASDU 的完整解析。
+      点击每行可展开 ASDU 字段详情。</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-body">
+      <h4>修改数据值并触发自发上送</h4>
+      <p>在数据点表格中点击 ✏️ 修改值，或点击 📡 手动触发自发上送（COT=3）。
+      主站即可收到更新后的遥信/遥测值。</p>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ─── 6. 界面总览 ─── -->
+<section id="ui-overview" class="section">
+<h2>6. 界面总览</h2>
+
+<p>Web UI 采用深色主题，整体布局分为以下区域：</p>
+<table>
+  <thead><tr><th>区域</th><th>位置</th><th>功能</th></tr></thead>
+  <tbody>
+    <tr><td>顶部标题栏</td><td>最上方横条</td><td>产品名称、新建实例按钮、SignalR 连接状态</td></tr>
+    <tr><td>实例标签页栏</td><td>标题栏下方</td><td>所有从站实例的切换标签，显示端口/CA/TLS/运行状态，可关闭删除</td></tr>
+    <tr><td>类型过滤侧边栏</td><td>实例面板左侧</td><td>按数据类型分类过滤显示数据点，显示各类型数量</td></tr>
+    <tr><td>实例工具栏</td><td>内容区顶部</td><td>实例状态信息、启动/停止/总召唤/添加数据点按钮</td></tr>
+    <tr><td>子标签页</td><td>工具栏下方</td><td>数据点 / 命令记录 / 通信记录 / 事件日志 / 协议参考</td></tr>
+    <tr><td>连接状态条</td><td>子标签页上方</td><td>实时显示所有已连接主站的 IP:端口 和激活状态</td></tr>
+    <tr><td>底部状态栏</td><td>页面最底部</td><td>实例总数、当前实例端口/CA/运行状态</td></tr>
+  </tbody>
+</table>
+</section>
+
+<!-- ─── 7. 实例管理 ─── -->
+<section id="instances" class="section">
+<h2>7. 实例管理</h2>
+
+<h3>7.1 创建新实例</h3>
+<p>点击顶部工具栏 <strong>➕ 新建Slave实例</strong> 或实例标签栏末尾的 <strong>＋</strong> 按钮，弹出创建对话框：</p>
+
+<table>
+  <thead><tr><th>字段</th><th>默认值</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>TCP 端口</td><td>2404</td><td>IEC 104 监听端口，同一时刻不可与其他实例重复</td></tr>
+    <tr><td>公共地址 CA</td><td>1</td><td>站公共地址，与主站配置匹配</td></tr>
+    <tr><td>启用 TLS</td><td>关</td><td>勾选后展开 TLS 证书配置区域</td></tr>
+    <tr><td>周期背景扫描间隔</td><td>0（禁用）</td><td>大于 0 时每 N 秒以 COT=2 上送所有监视量</td></tr>
+    <tr><td>自定义 APCI 参数</td><td>符合标准默认</td><td>勾选后可修改 k/w/T0/T1/T2/T3</td></tr>
+    <tr><td>调试输出</td><td>关</td><td>开启后将 lib60870 底层 I/S/U 帧收发细节输出到控制台及 <code>debug_logs/&lt;实例ID&gt;/</code> 目录</td></tr>
+  </tbody>
+</table>
+
+<div class="box box-info">
+  <p><strong>端口冲突检测：</strong>若输入端口已被当前运行的其他实例占用，创建时会即时提示错误，不会创建重复实例。</p>
+</div>
+
+<h3>7.2 启动 / 停止 / 删除实例</h3>
+<ul>
+  <li><strong>▶ 启动：</strong>对已停止的实例重新开始 TCP 监听</li>
+  <li><strong>⏹ 停止：</strong>断开所有主站连接，关闭 TCP 监听</li>
+  <li><strong>× 关闭标签：</strong>永久删除该实例（需二次确认）</li>
+</ul>
+
+<h3>7.3 实例状态</h3>
+<table>
+  <thead><tr><th>标签显示</th><th>含义</th></tr></thead>
+  <tbody>
+    <tr><td>🟢 绿色圆点</td><td>从站正在监听，TCP 已就绪</td></tr>
+    <tr><td>🔴 红色圆点</td><td>从站已停止，不接受连接</td></tr>
+    <tr><td><span class="badge badge-blue">TLS</span></td><td>该实例启用了 TLS 加密</td></tr>
+  </tbody>
+</table>
+</section>
+
+<!-- ─── 8. 数据点管理 ─── -->
+<section id="datapoints" class="section">
+<h2>8. 数据点管理</h2>
+
+<h3>8.1 默认数据点</h3>
+<p>每个新建实例会自动载入演示数据集，涵盖 IEC 104 所有主要监视类型：</p>
+
+<table>
+  <thead><tr><th>IOA 范围</th><th>类型</th><th>分组</th><th>数量</th></tr></thead>
+  <tbody>
+    <tr><td>1–11</td><td>M_SP_NA_1 (1) / M_SP_TB_1 (30) — 单点遥信</td><td>GroupId=1</td><td>5</td></tr>
+    <tr><td>20–31</td><td>M_DP_NA_1 (3) / M_DP_TB_1 (31) — 双点遥信</td><td>GroupId=1</td><td>4</td></tr>
+    <tr><td>40–50</td><td>M_ST_NA_1 (5) / M_ST_TB_1 (32) — 步位置</td><td>无分组</td><td>3</td></tr>
+    <tr><td>60–70</td><td>M_BO_NA_1 (7) / M_BO_TB_1 (33) — 32位串</td><td>无分组</td><td>3</td></tr>
+    <tr><td>100–150</td><td>M_ME_NA_1(9)/NB(11)/NC(13)/ND(21)+时标系列 — 测量值</td><td>GroupId=2</td><td>10</td></tr>
+    <tr><td>160–170</td><td>M_IT_NA_1 (15) / M_IT_TB_1 (37) — 累计量</td><td>GroupId=3</td><td>3</td></tr>
+    <tr><td>180</td><td>M_PS_NA_1 (20) — 成组单点</td><td>无分组</td><td>1</td></tr>
+    <tr><td>1001–1091</td><td>全部控制方向命令类型（C_SC/DC/RC/SE/BO 含时标版）</td><td>无分组</td><td>16</td></tr>
+  </tbody>
+</table>
+
+<h3>8.2 数据点表格列说明</h3>
+<table>
+  <thead><tr><th>列名</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><strong>IOA</strong></td><td>信息对象地址，唯一标识符</td></tr>
+    <tr><td><strong>名称</strong></td><td>用户自定义描述字符串</td></tr>
+    <tr><td><strong>TypeID</strong></td><td>IEC 104 类型标识符（如 M_SP_NA_1）</td></tr>
+    <tr><td><strong>详细字段</strong></td><td>根据类型解析的字段值，如 SPI/DPI/NVA/SVA/BCR/BSI</td></tr>
+    <tr><td><strong>QDS.OV/BL/SB/NT/IV</strong></td><td>品质描述词各位，点击可即时切换（命令类和 M_ME_ND_1 无此列）</td></tr>
+    <tr><td><strong>分组</strong></td><td>GroupId（0=无分组，蓝色徽标表示分组号 1–16）</td></tr>
+    <tr><td><strong>最后更新</strong></td><td>该数据点值最后一次变化的时间戳（毫秒精度）</td></tr>
+    <tr><td><strong>操作</strong></td><td>✏️ 修改值 / 📡 自发上送 / 🗑️ 删除</td></tr>
+  </tbody>
+</table>
+
+<h3>8.3 修改数据点值</h3>
+<p>点击 <strong>✏️</strong> 进入内联编辑模式：</p>
+<ul>
+  <li><strong>单点/双点遥信、单点/双点命令：</strong>显示下拉选择器（限定合法枚举值）</li>
+  <li><strong>步调节命令：</strong>下拉选择 LOWER↓ / HIGHER↑</li>
+  <li><strong>测量值/累计量/浮点/32位串：</strong>显示数值输入框，支持小数，Enter 键快速确认</li>
+</ul>
+<p>确认后，若实例正在运行，系统会自动以 <strong>COT=3（自发）</strong> 向所有已连接主站广播更新值。</p>
+
+<h3>8.4 添加自定义数据点</h3>
+<p>点击 <strong>➕ 添加数据点</strong> 弹出对话框，填写：</p>
+<ul>
+  <li><strong>IOA 地址：</strong>0–16777215，不可与已有数据点重复</li>
+  <li><strong>TypeID 类型：</strong>从下拉菜单选择，含全部监视/控制类型</li>
+  <li><strong>名称：</strong>描述字符串</li>
+  <li><strong>初始值：</strong>数值型初始值</li>
+  <li><strong>分组 ID：</strong>0=全站总召响应，1–16=分配到第 N 组（响应 QOI=21~36）</li>
+</ul>
+
+<h3>8.5 删除数据点</h3>
+<p>点击 🗑️ 后二次确认删除。已传输中的数据不受影响，仅移除本地记录。</p>
+</section>
+
+<!-- ─── 9. 品质标志操作 ─── -->
+<section id="quality" class="section">
+<h2>9. 品质描述词（QDS）操作</h2>
+
+<p>IEC 104 中每个带品质的测量值携带一个 8 位品质描述词（QDS）。系统完整支持以下 5 个有效位：</p>
+
+<table>
+  <thead><tr><th>位</th><th>缩写</th><th>全称</th><th>含义（=1 时）</th></tr></thead>
+  <tbody>
+    <tr><td>bit0</td><td class="td-code">OV</td><td>Overflow</td><td>溢出：测量值超出范围</td></tr>
+    <tr><td>bit4</td><td class="td-code">BL</td><td>Blocked</td><td>被闭锁：数值锁定、不跟随实际变化</td></tr>
+    <tr><td>bit5</td><td class="td-code">SB</td><td>Substituted</td><td>被取代：数值由人工置入</td></tr>
+    <tr><td>bit6</td><td class="td-code">NT</td><td>NonTopical</td><td>非当前：数值非最新采样</td></tr>
+    <tr><td>bit7</td><td class="td-code">IV</td><td>Invalid</td><td>无效：数值不可信</td></tr>
+  </tbody>
+</table>
+
+<p>在数据点表格中，各 QDS 列显示 <strong style="color:var(--green)">False</strong>（正常）或
+<strong style="color:var(--red)">True</strong>（置位）。点击任意品质单元格可立即反转该位，系统通过
+<code>UpdateDataPoint</code> Hub 方法异步更新并以 COT=3 广播给所有主站。</p>
+
+<div class="box box-tip">
+  <p><strong>测试提示：</strong>可通过同时设置 IV=True 模拟传感器故障场景，测试主站对无效数据的告警处理逻辑。</p>
+</div>
+</section>
+
+<!-- ─── 10. 遥控命令处理 ─── -->
+<section id="commands" class="section">
+<h2>10. 遥控命令处理</h2>
+
+<h3>10.1 支持的命令类型</h3>
+<table>
+  <thead><tr><th>TI</th><th>名称</th><th>数值范围</th><th>支持 S/E</th><th>支持时标</th></tr></thead>
+  <tbody>
+    <tr><td>45 / 58</td><td>C_SC_NA_1 / C_SC_TA_1 — 单点命令</td><td>0(OFF)/1(ON)</td><td class="td-center">✅</td><td class="td-center">58有</td></tr>
+    <tr><td>46 / 59</td><td>C_DC_NA_1 / C_DC_TA_1 — 双点命令</td><td>0~3（1=OFF,2=ON）</td><td class="td-center">✅</td><td class="td-center">59有</td></tr>
+    <tr><td>47 / 60</td><td>C_RC_NA_1 / C_RC_TA_1 — 步调节命令</td><td>1=LOWER,2=HIGHER</td><td class="td-center">✅</td><td class="td-center">60有</td></tr>
+    <tr><td>48 / 61</td><td>C_SE_NA_1 / C_SE_TA_1 — 设定归一化值</td><td>-1.0~+1.0</td><td class="td-center">✅</td><td class="td-center">61有</td></tr>
+    <tr><td>49 / 62</td><td>C_SE_NB_1 / C_SE_TB_1 — 设定标度值</td><td>-32768~+32767</td><td class="td-center">✅</td><td class="td-center">62有</td></tr>
+    <tr><td>50 / 63</td><td>C_SE_NC_1 / C_SE_TC_1 — 设定浮点值</td><td>IEEE754 float</td><td class="td-center">✅</td><td class="td-center">63有</td></tr>
+    <tr><td>51 / 64</td><td>C_BO_NA_1 / C_BO_TA_1 — 32位串命令</td><td>32bit unsigned</td><td class="td-center">❌</td><td class="td-center">64有</td></tr>
+  </tbody>
+</table>
+
+<h3>10.2 SBO 选择-执行（Select-Before-Operate）流程</h3>
+
+<div class="flow">
+  <div class="flow-box rx">主站发 SELECT<br>COT=6, S/E=1</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box sys">弹出用户确认<br>倒计时 30s</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box tx">ACT_CON (+)<br>COT=7, S/E=1</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box rx">主站发 EXECUTE<br>COT=6, S/E=0</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box tx">ACT_CON (+)<br>+ ACT_TERM<br>COT=7/10</div>
+</div>
+
+<p><strong>取消流程：</strong>主站发 DEACTIVATION（COT=8）→ 从站回 DEACT_CON（COT=9）。</p>
+<p><strong>否认流程：</strong>用户点击"拒绝"或 30s 超时 → ACT_CON（PN=1，否定）。</p>
+
+<h3>10.3 直接执行流程</h3>
+<div class="flow">
+  <div class="flow-box rx">主站发 EXECUTE<br>COT=6, S/E=0</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box sys">弹出用户确认<br>倒计时 30s</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box tx">ACT_CON (+)<br>COT=7</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box tx">数据值更新<br>COT=3 自发</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box tx">ACT_TERM<br>COT=10</div>
+</div>
+
+<h3>10.4 脉冲命令自动复位</h3>
+<table>
+  <thead><tr><th>QU 值</th><th>含义</th><th>行为</th></tr></thead>
+  <tbody>
+    <tr><td>QU=0</td><td>无附加定义</td><td>持续保持，不自动复位</td></tr>
+    <tr><td>QU=1</td><td>短脉冲（Short Pulse）</td><td>200ms 后自动复位（ON→OFF 或 OFF→ON），并发送自发帧</td></tr>
+    <tr><td>QU=2</td><td>长脉冲（Long Pulse）</td><td>2000ms 后自动复位</td></tr>
+    <tr><td>QU=3</td><td>持续输出（Persistent）</td><td>持续保持，不自动复位</td></tr>
+  </tbody>
+</table>
+
+<h3>10.5 命令记录</h3>
+<p>切换到 <strong>⚙️ 命令记录</strong> 标签页，可看到每条命令的：序号、时间、IOA、类型、值、
+QU 限定词、S（SELECT）/E（EXECUTE）标志、COT、执行状态（已选择/已执行/已取消/已超时）、来源主站 IP。</p>
+</section>
+
+<!-- ─── 11. 通信记录 ─── -->
+<section id="comm" class="section">
+<h2>11. 通信记录</h2>
+
+<p>切换到 <strong>📡 通信记录</strong> 标签页，实时展示每条 ASDU 的完整解码信息，最新帧在最顶部。</p>
+
+<h3>11.1 记录表格列</h3>
+<table>
+  <thead><tr><th>列</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>时间</td><td>精确到毫秒的本地时间</td></tr>
+    <tr><td>方向</td><td><code style="color:#1d4ed8">← RX</code> = 收到（来自主站）<br><code style="color:#16a34a">→ TX</code> = 发送（到主站）</td></tr>
+    <tr><td>类型</td><td>TypeID 名称 + TI 编号 + 元素数 + SQ 标志</td></tr>
+    <tr><td>IOA</td><td>信息对象地址</td></tr>
+    <tr><td>值</td><td>数值或状态字符串</td></tr>
+    <tr><td>COT</td><td>传送原因名称 + COT 编码 + PN（否定）/ T（测试）标志</td></tr>
+    <tr><td>说明</td><td>操作描述 + CA 公共地址 + OA 始发地址</td></tr>
+    <tr><td>连接</td><td>来源/目标主站 IP:端口</td></tr>
+  </tbody>
+</table>
+
+<h3>11.2 展开 ASDU 详情</h3>
+<p>点击任意行可展开完整 ASDU 解码文本，格式如下：</p>
+<pre>
+ASDU: TI=1(M_SP_NA_1)  VSQ: NUM=1 SQ=0  COT=20(总召唤响应)  T=0 PN=0 OA=0 CA=1
+体:   IOA=1  Val=0 (OFF)  全站召唤响应 IOA=1 QDS=0
+</pre>
+
+<h3>11.3 自动滚动与清空</h3>
+<ul>
+  <li>勾选 <strong>自动滚动</strong> 时新记录始终置顶</li>
+  <li>点击 <strong>🗑 清空</strong> 同时清空前端显示和サーバー端缓存</li>
+</ul>
+</section>
+
+<!-- ─── 12. 事件日志 ─── -->
+<section id="logs" class="section">
+<h2>12. 事件日志</h2>
+
+<p>切换到 <strong>📋 事件日志</strong> 标签页，按时间倒序显示系统事件。日志类型包括：</p>
+
+<table>
+  <thead><tr><th>类型标签</th><th>含义</th><th>颜色</th></tr></thead>
+  <tbody>
+    <tr><td><code>started</code></td><td>从站启动/数据传输激活</td><td>绿色</td></tr>
+    <tr><td><code>stopped</code></td><td>数据传输已停止（INACTIVE 事件）</td><td>默认</td></tr>
+    <tr><td><code>connect</code></td><td>主站 TCP 连接建立</td><td>绿色</td></tr>
+    <tr><td><code>disconnect</code></td><td>主站 TCP 连接断开</td><td>红色</td></tr>
+    <tr><td><code>init</code></td><td>发送 M_EI_NA_1 初始化结束帧</td><td>蓝色</td></tr>
+    <tr><td><code>gi</code></td><td>总召唤/分组召唤请求处理</td><td>黄色</td></tr>
+    <tr><td><code>ci</code></td><td>电能量召唤处理</td><td>黄色</td></tr>
+    <tr><td><code>clockSync</code></td><td>时钟同步处理及偏差计算</td><td>蓝色</td></tr>
+    <tr><td><code>cmdReceive</code></td><td>收到遥控命令帧</td><td>蓝色</td></tr>
+    <tr><td><code>select</code></td><td>SELECT 命令已确认</td><td>橙色</td></tr>
+    <tr><td><code>execute</code></td><td>EXECUTE 命令已执行</td><td>绿色</td></tr>
+    <tr><td><code>cancel</code></td><td>命令已取消（DEACTIVATION 确认）</td><td>红色</td></tr>
+    <tr><td><code>reject</code></td><td>命令被拒绝（CA不符/IOA不存在/COT非法/跨连接等）</td><td>红色</td></tr>
+    <tr><td><code>test</code></td><td>收到测试命令（C_TS_NA_1）或 T=1 测试帧不更新过程值</td><td>默认</td></tr>
+    <tr><td><code>reset</code></td><td>收到复位进程命令（C_RP_NA_1）</td><td>默认</td></tr>
+    <tr><td><code>pulse</code></td><td>脉冲命令自动复位</td><td>黄色</td></tr>
+    <tr><td><code>periodic</code></td><td>周期背景扫描触发</td><td>默认</td></tr>
+    <tr><td><code>timeout</code></td><td>SELECT 60s 超时或用户 30s 未响应命令确认</td><td>红色</td></tr>
+    <tr><td><code>error</code></td><td>异常错误</td><td>红色</td></tr>
+  </tbody>
+</table>
+</section>
+
+<!-- ─── 13. APCI 传输层 ─── -->
+<section id="iec104-apci" class="section">
+<h2>13. APCI 传输层详解</h2>
+
+<p>IEC 104 基于 TCP/IP，在 TCP 之上定义了 APCI（应用协议控制信息）。系统使用 lib60870.NET 实现
+所有 APCI 控制机制。</p>
+
+<h3>13.1 帧类型</h3>
+<table>
+  <thead><tr><th>帧类型</th><th>标识</th><th>用途</th></tr></thead>
+  <tbody>
+    <tr><td>I 帧</td><td>bit0=0</td><td>信息帧，携带 ASDU，含发送/接收序号</td></tr>
+    <tr><td>S 帧</td><td>0x01</td><td>监视帧，无数据，仅用于确认接收到的 I 帧</td></tr>
+    <tr><td>U 帧 STARTDT_ACT/CON</td><td>0x07/0x0B</td><td>激活/确认数据传输</td></tr>
+    <tr><td>U 帧 STOPDT_ACT/CON</td><td>0x13/0x23</td><td>停止/确认数据传输</td></tr>
+    <tr><td>U 帧 TESTFR_ACT/CON</td><td>0x43/0x83</td><td>心跳测试/确认（T3 超时触发）</td></tr>
+  </tbody>
+</table>
+
+<h3>13.2 传输序列</h3>
+<p>建连后的完整握手流程：</p>
+<div class="flow">
+  <div class="flow-box rx">TCP Connect</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box rx">STARTDT_ACT</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box tx">STARTDT_CON</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box tx">M_EI_NA_1<br>COT=4</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box rx">C_IC_NA_1<br>总召唤</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box tx">数据帧+<br>ACT_TERM</div>
+</div>
+
+<h3>13.3 参数说明</h3>
+<table>
+  <thead><tr><th>参数</th><th>含义</th><th>标准默认值</th></tr></thead>
+  <tbody>
+    <tr><td class="td-code">k</td><td>发送窗口：最多 k 个 I 帧未收到确认</td><td>12</td></tr>
+    <tr><td class="td-code">w</td><td>确认窗口：至多收到 w 个 I 帧后必须发 S 帧确认</td><td>8</td></tr>
+    <tr><td class="td-code">T0</td><td>连接建立等待超时（STARTDT_CON 未收到时断开）</td><td>10s</td></tr>
+    <tr><td class="td-code">T1</td><td>发送侧超时：I 帧发出后未在 T1 内收到确认则断连</td><td>15s</td></tr>
+    <tr><td class="td-code">T2</td><td>接收侧超时：收到 I 帧后最迟 T2 内发 S 帧确认（T2 &lt; T1）</td><td>10s</td></tr>
+    <tr><td class="td-code">T3</td><td>空闲超时：连接空闲超过 T3 后发 TESTFR_ACT 心跳包</td><td>20s</td></tr>
+  </tbody>
+</table>
+</section>
+
+<!-- ─── 14. 监视方向类型 ─── -->
+<section id="monitor-types" class="section">
+<h2>14. 监视方向数据类型</h2>
+
+<h3>14.1 无时标类型</h3>
+<table>
+  <thead><tr><th>TI</th><th>标识符</th><th>名称</th><th>数据格式</th><th>QDS</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td class="td-code">M_SP_NA_1</td><td>单点遥信</td><td>SIQ: SPI(1bit) + QDS(7bit)</td><td class="td-center">✅</td></tr>
+    <tr><td>3</td><td class="td-code">M_DP_NA_1</td><td>双点遥信</td><td>DIQ: DPI(2bit) + QDS(6bit)</td><td class="td-center">✅</td></tr>
+    <tr><td>5</td><td class="td-code">M_ST_NA_1</td><td>步位置信息</td><td>VTI: V(7bit,I7,-64~63) + T(1bit) + QDS</td><td class="td-center">✅</td></tr>
+    <tr><td>7</td><td class="td-code">M_BO_NA_1</td><td>32位串</td><td>BSI(32bit) + QDS</td><td class="td-center">✅</td></tr>
+    <tr><td>9</td><td class="td-code">M_ME_NA_1</td><td>归一化测量值</td><td>NVA(F16,-1~+1) + QDS</td><td class="td-center">✅</td></tr>
+    <tr><td>11</td><td class="td-code">M_ME_NB_1</td><td>标度化测量值</td><td>SVA(I16,-32768~+32767) + QDS</td><td class="td-center">✅</td></tr>
+    <tr><td>13</td><td class="td-code">M_ME_NC_1</td><td>短浮点测量值</td><td>IEEE754 float(32bit) + QDS</td><td class="td-center">✅</td></tr>
+    <tr><td>15</td><td class="td-code">M_IT_NA_1</td><td>累计量</td><td>BCR: I32 + SEQ{SQ,CY,CA,IV}</td><td class="td-center">BCR</td></tr>
+    <tr><td>20</td><td class="td-code">M_PS_NA_1</td><td>成组单点</td><td>SCD: STn(16bit) + CDn(16bit) + QDS</td><td class="td-center">✅</td></tr>
+    <tr><td>21</td><td class="td-code">M_ME_ND_1</td><td>无品质归一化值</td><td>NVA(F16) 仅数值，无 QDS</td><td class="td-center">❌</td></tr>
+  </tbody>
+</table>
+
+<h3>14.2 带 CP56Time2a 时标类型</h3>
+<table>
+  <thead><tr><th>TI</th><th>标识符</th><th>对应无时标类型</th><th>附加字节数</th></tr></thead>
+  <tbody>
+    <tr><td>30</td><td class="td-code">M_SP_TB_1</td><td>M_SP_NA_1 (1)</td><td>+7字节</td></tr>
+    <tr><td>31</td><td class="td-code">M_DP_TB_1</td><td>M_DP_NA_1 (3)</td><td>+7字节</td></tr>
+    <tr><td>32</td><td class="td-code">M_ST_TB_1</td><td>M_ST_NA_1 (5)</td><td>+7字节</td></tr>
+    <tr><td>33</td><td class="td-code">M_BO_TB_1</td><td>M_BO_NA_1 (7)</td><td>+7字节</td></tr>
+    <tr><td>34</td><td class="td-code">M_ME_TD_1</td><td>M_ME_NA_1 (9)</td><td>+7字节</td></tr>
+    <tr><td>35</td><td class="td-code">M_ME_TE_1</td><td>M_ME_NB_1 (11)</td><td>+7字节</td></tr>
+    <tr><td>36</td><td class="td-code">M_ME_TF_1</td><td>M_ME_NC_1 (13)</td><td>+7字节</td></tr>
+    <tr><td>37</td><td class="td-code">M_IT_TB_1</td><td>M_IT_NA_1 (15)</td><td>+7字节</td></tr>
+  </tbody>
+</table>
+
+<p>CP56Time2a 时标包含毫秒(16bit)、分钟、小时、日期、月份、年份，共 7 字节，精度为 1 毫秒。
+时标值来源于数据点的 <code>LastUpdate</code>，当启用时钟同步时会加入主从时钟偏差修正。</p>
+</section>
+
+<!-- ─── 15. 控制方向类型 ─── -->
+<section id="control-types" class="section">
+<h2>15. 控制方向命令类型</h2>
+
+<h3>15.1 无时标命令</h3>
+<table>
+  <thead><tr><th>TI</th><th>标识符</th><th>命令对象</th><th>数值字段</th></tr></thead>
+  <tbody>
+    <tr><td>45</td><td class="td-code">C_SC_NA_1</td><td>单点命令</td><td>SCO: SCS(1bit) + QU(5bit) + SE(1bit)</td></tr>
+    <tr><td>46</td><td class="td-code">C_DC_NA_1</td><td>双点命令</td><td>DCO: DCS(2bit) + QU(5bit) + SE(1bit)</td></tr>
+    <tr><td>47</td><td class="td-code">C_RC_NA_1</td><td>步调节命令</td><td>RCO: RCS(2bit) + QU(5bit) + SE(1bit)</td></tr>
+    <tr><td>48</td><td class="td-code">C_SE_NA_1</td><td>设定归一化值</td><td>NVA(F16) + QOS: QL(7bit) + SE(1bit)</td></tr>
+    <tr><td>49</td><td class="td-code">C_SE_NB_1</td><td>设定标度值</td><td>SVA(I16) + QOS</td></tr>
+    <tr><td>50</td><td class="td-code">C_SE_NC_1</td><td>设定浮点值</td><td>float(32bit) + QOS</td></tr>
+    <tr><td>51</td><td class="td-code">C_BO_NA_1</td><td>32位串命令</td><td>BSI(32bit)</td></tr>
+  </tbody>
+</table>
+
+<h3>15.2 带 CP56Time2a 时标命令</h3>
+<table>
+  <thead><tr><th>TI</th><th>标识符</th><th>对应无时标</th></tr></thead>
+  <tbody>
+    <tr><td>58</td><td class="td-code">C_SC_TA_1</td><td>C_SC_NA_1 (45)</td></tr>
+    <tr><td>59</td><td class="td-code">C_DC_TA_1</td><td>C_DC_NA_1 (46)</td></tr>
+    <tr><td>60</td><td class="td-code">C_RC_TA_1</td><td>C_RC_NA_1 (47)</td></tr>
+    <tr><td>61</td><td class="td-code">C_SE_TA_1</td><td>C_SE_NA_1 (48)</td></tr>
+    <tr><td>62</td><td class="td-code">C_SE_TB_1</td><td>C_SE_NB_1 (49)</td></tr>
+    <tr><td>63</td><td class="td-code">C_SE_TC_1</td><td>C_SE_NC_1 (50)</td></tr>
+    <tr><td>64</td><td class="td-code">C_BO_TA_1</td><td>C_BO_NA_1 (51)</td></tr>
+  </tbody>
+</table>
+
+<p>带时标命令携带主站侧时间戳（CP56Time2a），系统会解析并显示于通信记录和事件日志中，
+包括 TIV（时间有效位）和 SU（替代位）。</p>
+</section>
+
+<!-- ─── 16. 召唤机制 ─── -->
+<section id="interrogation" class="section">
+<h2>16. 召唤机制</h2>
+
+<h3>16.1 总站召唤 C_IC_NA_1</h3>
+
+<table>
+  <thead><tr><th>QOI 值</th><th>名称</th><th>响应范围</th><th>响应 COT</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>（非标准，兼容部分 SCADA）</td><td>全部监视量</td><td>COT=20 INROGEN</td></tr>
+    <tr><td>20</td><td>全站总召唤（标准）</td><td>全部监视量</td><td>COT=20 INROGEN</td></tr>
+    <tr><td>21</td><td>第 1 组</td><td>GroupId=1 的数据点</td><td>COT=21 INROGEN1</td></tr>
+    <tr><td>22</td><td>第 2 组</td><td>GroupId=2 的数据点</td><td>COT=22 INROGEN2</td></tr>
+    <tr><td>…</td><td>…</td><td>…</td><td>…</td></tr>
+    <tr><td>36</td><td>第 16 组</td><td>GroupId=16 的数据点</td><td>COT=36 INROGEN16</td></tr>
+    <tr><td>其他</td><td>非标准值</td><td>—</td><td>ACT_CON (PN=1，否认)</td></tr>
+  </tbody>
+</table>
+
+<p>响应序列：<code>ACT_CON(+)</code> → 逐条数据帧 → <code>ACT_TERM</code></p>
+
+<h3>16.2 电能量召唤 C_CI_NA_1</h3>
+
+<p>QCC（限定词）按位解析：</p>
+<table>
+  <thead><tr><th>位域</th><th>名称</th><th>值定义</th></tr></thead>
+  <tbody>
+    <tr><td>bit 0-5</td><td>RQT（请求限定词）</td><td>0=无请求，1-4=对应组计数量，5=全部计数量</td></tr>
+    <tr><td>bit 6-7</td><td>FRZ（冻结限定词）</td><td>0=读（不冻结），1=冻结不复位，2=冻结并复位，3=计数量复位</td></tr>
+  </tbody>
+</table>
+
+<table>
+  <thead><tr><th>RQT</th><th>响应范围</th><th>COT</th></tr></thead>
+  <tbody>
+    <tr><td>5</td><td>全部累计量（M_IT_NA_1/M_IT_TB_1）</td><td>COT=37 REQCOGEN</td></tr>
+    <tr><td>1</td><td>GroupId=1 的累计量</td><td>COT=38 REQCO1</td></tr>
+    <tr><td>2</td><td>GroupId=2 的累计量</td><td>COT=39 REQCO2</td></tr>
+    <tr><td>3</td><td>GroupId=3 的累计量</td><td>COT=40 REQCO3</td></tr>
+    <tr><td>4</td><td>GroupId=4 的累计量</td><td>COT=41 REQCO4</td></tr>
+    <tr><td>0 / &gt;5</td><td>无请求（0）或非标准值</td><td>ACT_CON (PN=1，否认)</td></tr>
+  </tbody>
+</table>
+</section>
+
+<!-- ─── 17. SBO 流程 ─── -->
+<section id="sbo" class="section">
+<h2>17. SBO 流程详解</h2>
+
+<h3>完整 SELECT → EXECUTE 流程</h3>
+<pre>
+主站                              从站
+  |                                |
+  |----[SELECT] COT=6, S/E=1 ----->|
+  |                                |---- 弹出用户确认对话框（30s 倒计时）
+  |                                |
+  |&lt;---[ACT_CON(+)] COT=7, S/E=1--|  用户点"确认"
+  |                                |
+  |----[EXECUTE] COT=6, S/E=0 ---->|
+  |                                |---- 已有 SELECT，自动接受，更新数据值
+  |&lt;---[ACT_CON(+)] COT=7, S/E=0--|
+  |&lt;---[M_SP_NA_1] COT=3 (自发)---|  数据变化通知
+  |&lt;---[ACT_TERM] COT=10 ----------|
+  |                                |
+  <span class="c"># SELECT 超时（60s 无 EXECUTE）→ 自动取消</span>
+  <span class="c"># 主动取消：主站发 DEACTIVATION(COT=8) → 从站回 DEACT_CON(COT=9)</span>
+</pre>
+
+<h3>跨连接保护</h3>
+<p>若 A 连接已完成 SELECT，B 连接随后发来同 IOA 的 EXECUTE，从站立即回 ACT_CON(PN=1)（否认），
+不会触发用户确认，确保命令源头一致性。</p>
+
+<h3>连接断开时清理</h3>
+<p>某主站 TCP 连接断开时，所有该连接的 pending SELECT 记录自动清除，
+防止孤立选择状态阻塞后续操作。</p>
+</section>
+
+<!-- ─── 18. 系统命令 ─── -->
+<section id="system-cmds" class="section">
+<h2>18. 系统级命令</h2>
+
+<table>
+  <thead><tr><th>TI</th><th>名称</th><th>从站处理方式</th></tr></thead>
+  <tbody>
+    <tr><td>100</td><td class="td-code">C_IC_NA_1</td><td>总召唤（见第 16 节）</td></tr>
+    <tr><td>101</td><td class="td-code">C_CI_NA_1</td><td>电能量召唤（见第 16 节）</td></tr>
+    <tr><td>102</td><td class="td-code">C_RD_NA_1</td><td>读命令：以 COT=5(REQUEST) 单独回送指定 IOA 的当前值</td></tr>
+    <tr><td>103</td><td class="td-code">C_CS_NA_1</td><td>时钟同步：解析 CP56Time2a，计算主从偏差，后续 TB 类型时标加入偏差修正</td></tr>
+    <tr><td>104</td><td class="td-code">C_TS_NA_1</td><td>测试命令：回 ACT_CON(+)，记录日志</td></tr>
+    <tr><td>105</td><td class="td-code">C_RP_NA_1</td><td>复位进程命令：回 ACT_CON(+)，记录日志</td></tr>
+  </tbody>
+</table>
+
+<h3>初始化结束 M_EI_NA_1 (TI=70)</h3>
+<p>每个新建 TCP 连接在首次收到 ASDU 时（ASDU handler 被触发前），从站立即向该连接单播发送：</p>
+<pre>
+M_EI_NA_1  COT=4(INITIALIZED)  COI=0(本地上电)
+</pre>
+<p>此帧严格在第一个 ASDU 响应之前发送，确保主站能正确识别从站初始化状态。</p>
+</section>
+
+<!-- ─── 19. TLS ─── -->
+<section id="tls" class="section">
+<h2>19. TLS 加密通信</h2>
+
+<p>系统支持基于 X.509 证书的 TLS 加密，符合 IEC 104 TLS 扩展规范（IEC 62351-3）。</p>
+
+<h3>19.1 配置步骤</h3>
+<div class="steps">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <h4>准备服务端证书</h4>
+      <p>需要 PKCS12 格式（.pfx / .p12）包含证书链和私钥。可通过以下命令生成自签证书：</p>
+      <pre>
+<span class="c"># 使用 OpenSSL 生成自签名证书（测试用）</span>
+openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes
+openssl pkcs12 -export -out server.pfx -inkey key.pem -in cert.pem -passout pass:yourpassword</pre>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <h4>在新建实例对话框中启用 TLS</h4>
+      <p>勾选 <strong>启用 TLS 加密通信</strong>，然后：
+      <br>• 点击 <strong>浏览...</strong> 从本地选择 .pfx 文件（自动上传到服务端 certs 目录）
+      <br>• 或直接在路径框中输入服务端绝对路径
+      <br>• 填写 PFX 密码（无密码留空）</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <h4>（可选）配置客户端证书验证</h4>
+      <p>• 填写 CA 证书路径（PEM/DER 格式）用于验证主站客户端证书
+      <br>• 勾选 <strong>要求主站提供并验证客户端证书</strong> 后仅特定主站可连接</p>
+    </div>
+  </div>
+</div>
+
+<div class="box box-warn">
+  <p><strong>证书位置：</strong>通过浏览器上传的证书文件保存于 <code>&lt;程序目录&gt;/certs/</code> 文件夹，
+  文件名不可含路径分隔符。仅允许 .pfx、.p12、.crt、.cer、.pem 格式。</p>
+</div>
+
+<h3>19.2 安全说明</h3>
+<ul>
+  <li>服务端证书使用 <code>MachineKeySet | PersistKeySet | Exportable</code> 标志加载</li>
+  <li>启用 CA 验证时进行完整证书链验证（<code>ChainValidation=true</code>）</li>
+  <li>PFX 密码在内存中以字符串传递，建议生产环境使用操作系统密钥存储</li>
+</ul>
+</section>
+
+<!-- ─── 20. 周期背景扫描 ─── -->
+<section id="periodic" class="section">
+<h2>20. 周期背景扫描</h2>
+
+<p>背景扫描（COT=2 BACKGROUND_SCAN）是 IEC 104 标准规定的数据传送方式之一，从站定期向主站
+发送所有监视量，以维持数据同步并防止主站因长期无数据而断开连接。</p>
+
+<h3>配置</h3>
+<p>在新建实例对话框中设置 <strong>周期背景扫描间隔（秒）</strong>：</p>
+<ul>
+  <li><strong>0（默认）：</strong>禁用，不发送周期数据</li>
+  <li><strong>大于 0：</strong>每 N 秒向所有已连接主站广播全部监视量，COT=2</li>
+</ul>
+
+<div class="box box-tip">
+  <p><strong>推荐值：</strong>
+  若主站有 15 秒无数据断连机制，建议设置为 10 秒；若主站依赖 TESTFR 保活则无需开启。
+  T3=20 秒的 TESTFR 心跳帧可独立维持连接，周期扫描主要用于数据同步。</p>
+</div>
+</section>
+
+<!-- ─── 21. APCI 参数配置 ─── -->
+<section id="apci-config" class="section">
+<h2>21. APCI 参数配置</h2>
+
+<p>在新建实例对话框中勾选 <strong>自定义 APCI 参数</strong> 可修改传输层参数：</p>
+
+<table>
+  <thead><tr><th>参数</th><th>输入范围</th><th>标准默认</th><th>修改建议</th></tr></thead>
+  <tbody>
+    <tr><td><b>k</b>（发送窗口）</td><td>1–32767</td><td>12</td><td>高吞吐量场景可适当增大（如 32）</td></tr>
+    <tr><td><b>w</b>（确认窗口）</td><td>1–32767</td><td>8</td><td>保持 w ≤ k，通常设为 k 的 2/3</td></tr>
+    <tr><td><b>T0</b>（连接超时）</td><td>1–255s</td><td>10s</td><td>广域网可适当增大</td></tr>
+    <tr><td><b>T1</b>（发送超时）</td><td>1–255s</td><td>15s</td><td>需大于网络最大 RTT</td></tr>
+    <tr><td><b>T2</b>（确认超时）</td><td>1–255s</td><td>10s</td><td>需小于 T1</td></tr>
+    <tr><td><b>T3</b>（测试帧间隔）</td><td>1–255s</td><td>20s</td><td>长连接场景可增大以减少心跳流量</td></tr>
+  </tbody>
+</table>
+
+<div class="box box-warn">
+  <p><strong>注意：</strong>APCI 参数必须在实例<b>创建时</b>设置，已运行的实例无法动态修改。
+  需停止后删除，重新创建并配置新参数。</p>
+</div>
+</section>
+
+<!-- ─── 22. 数据分组 ─── -->
+<section id="groups" class="section">
+<h2>22. 数据分组（GroupId）</h2>
+
+<p>IEC 104 允许主站对数据点分组召唤（QOI=21~36，对应第 1~16 组）。通过为数据点分配
+<strong>GroupId</strong>（1–16）即可响应分组召唤请求。</p>
+
+<h3>分组规则</h3>
+<table>
+  <thead><tr><th>GroupId</th><th>含义</th><th>响应 QOI</th></tr></thead>
+  <tbody>
+    <tr><td>0（默认）</td><td>无分组，仅响应全站总召（QOI=20）</td><td>QOI=20/0</td></tr>
+    <tr><td>1</td><td>第 1 组</td><td>QOI=21 及 QOI=20（全站包含所有组）</td></tr>
+    <tr><td>2</td><td>第 2 组</td><td>QOI=22</td></tr>
+    <tr><td>…</td><td>…</td><td>…</td></tr>
+    <tr><td>16</td><td>第 16 组</td><td>QOI=36</td></tr>
+  </tbody>
+</table>
+
+<h3>默认分组分配</h3>
+<ul>
+  <li><strong>GroupId=1：</strong>IOA 1–31（单点/双点遥信）</li>
+  <li><strong>GroupId=2：</strong>IOA 100–150（归一化/标度化/浮点测量值）</li>
+  <li><strong>GroupId=3：</strong>IOA 160–170（累计量/电能量）</li>
+  <li><strong>GroupId=0：</strong>其他所有数据点（步位置、32位串、命令等）</li>
+</ul>
+
+<p>分组设置在数据点表格的 <strong>分组</strong> 列中以蓝色徽标显示（"—" 表示无分组）。
+添加新数据点时可在对话框的 <strong>分组 ID</strong> 字段指定。</p>
+</section>
+
+<!-- ─── 23. REST API ─── -->
+<section id="rest-api" class="section">
+<h2>23. REST API 接口</h2>
+
+<p>系统提供轻量级 REST HTTP 接口供第三方程序查询实例状态：</p>
+
+<h3>获取所有实例列表</h3>
+<pre>
+GET http://localhost:5010/api/instances
+</pre>
+<p>返回 JSON 数组，每项包含：</p>
+<pre>
+[
+  {
+    <span class="s">"id"</span>:              <span class="s">"slave-1"</span>,
+    <span class="s">"port"</span>:            <span class="v">2404</span>,
+    <span class="s">"commonAddress"</span>:   <span class="v">1</span>,
+    <span class="s">"isListening"</span>:     <span class="v">true</span>,
+    <span class="s">"connectionCount"</span>: <span class="v">2</span>,
+    <span class="s">"dataPointCount"</span>:  <span class="v">50</span>,
+    <span class="s">"tlsEnabled"</span>:      <span class="v">false</span>
+  }
+]
+</pre>
+
+<h3>SignalR Hub 接口 (/hub)</h3>
+<p>采用 ASP.NET Core SignalR（WebSocket），支持从浏览器或 .NET 客户端实时双向通信：</p>
+<table>
+  <thead><tr><th>方向</th><th>方法名</th><th>参数</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>客户端调用</td><td class="td-code">CreateInstance</td><td>port, ca, tls参数..., periodicSec, apciK~T3</td><td>创建并启动新实例</td></tr>
+    <tr><td>客户端调用</td><td class="td-code">StartInstance / StopInstance</td><td>instanceId</td><td>启动/停止实例</td></tr>
+    <tr><td>客户端调用</td><td class="td-code">RemoveInstance</td><td>instanceId</td><td>删除实例</td></tr>
+    <tr><td>客户端调用</td><td class="td-code">GetInstanceData</td><td>instanceId</td><td>拉取实例完整数据</td></tr>
+    <tr><td>客户端调用</td><td class="td-code">UpdateDataPoint</td><td>instanceId, ioa, value, quality</td><td>修改数据点值和品质</td></tr>
+    <tr><td>客户端调用</td><td class="td-code">AddDataPoint</td><td>instanceId, ioa, typeId, name, value, groupId</td><td>添加数据点</td></tr>
+    <tr><td>客户端调用</td><td class="td-code">DeleteDataPoint</td><td>instanceId, ioa</td><td>删除数据点</td></tr>
+    <tr><td>客户端调用</td><td class="td-code">TriggerSpontaneous</td><td>instanceId, ioa</td><td>手动触发自发上送</td></tr>
+    <tr><td>客户端调用</td><td class="td-code">TriggerGI</td><td>instanceId</td><td>手动广播总召唤数据</td></tr>
+    <tr><td>客户端调用</td><td class="td-code">RespondCommand</td><td>instanceId, pendingId, accept</td><td>用户确认/拒绝命令</td></tr>
+    <tr><td>服务端推送</td><td class="td-code">instanceList</td><td>SlaveInstanceInfo[]</td><td>实例列表变化</td></tr>
+    <tr><td>服务端推送</td><td class="td-code">instanceData</td><td>id, {connections,dataPoints,...}</td><td>完整实例数据</td></tr>
+    <tr><td>服务端推送</td><td class="td-code">dataPointUpdate</td><td>id, DataPoint</td><td>数据点值变化</td></tr>
+    <tr><td>服务端推送</td><td class="td-code">commandReceived</td><td>id, CommandRecord</td><td>命令执行结果</td></tr>
+    <tr><td>服务端推送</td><td class="td-code">commandPending</td><td>id, CommandRecord</td><td>等待用户确认的命令</td></tr>
+    <tr><td>服务端推送</td><td class="td-code">commRecord</td><td>id, CommRecord</td><td>新通信记录帧</td></tr>
+    <tr><td>服务端推送</td><td class="td-code">log</td><td>id, LogEntry</td><td>新事件日志</td></tr>
+    <tr><td>服务端推送</td><td class="td-code">masterList</td><td>id, ConnectionInfo[]</td><td>从站连接状态变化</td></tr>
+  </tbody>
+</table>
+</section>
+
+<!-- Footer -->
+<div style="margin-top:60px;padding-top:20px;border-top:1px solid var(--border);font-size:12px;color:var(--text2)">
+  <p><strong>IEC 60870-5-104 Slave Simulator</strong> — 产品说明书 v1.0</p>
+  <p>协议库：lib60870.NET v2.3.0 | 运行时：ASP.NET Core .NET 8 | 通信：SignalR + WebSocket</p>
+  <p>本文档描述版本截至 2026-04-13。如与实际软件行为不符，以软件实际行为为准。</p>
+</div>
+
+</main>
+</div>
+
+<script>
+// Highlight active nav item on scroll
+const sections = document.querySelectorAll('.section');
+const navLinks = document.querySelectorAll('.nav-item');
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      navLinks.forEach(a => {
+        a.classList.toggle('active', a.getAttribute('href') === '#' + e.target.id);
+      });
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
