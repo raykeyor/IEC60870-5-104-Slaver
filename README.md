@@ -110,4 +110,4 @@ IEC104Simulator/
 
 ## License
 
-MIT
+GNU General Public License (GPL)
