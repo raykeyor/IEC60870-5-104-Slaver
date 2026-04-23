@@ -55,31 +55,12 @@ jobs:
           # create windows launcher
           printf '@echo off\n"%%~dp0\\IEC104Simulator.exe" %%*\n' > ./publish\run.bat
 
-      - name: Package (Windows and create NSIS installer)
+      - name: Package (Windows zip)
         if: matrix.rid == 'win-x64'
         shell: pwsh
         run: |
-          # ensure NSIS is available
-          choco install nsis -y
           # zip the publish folder
           Compress-Archive -Path ./publish/* -DestinationPath IEC104Simulator-${{ github.ref_name }}-${{ matrix.rid }}.zip
-          # create NSIS script
-          $nsi = @'
-          !define PRODUCT_NAME "IEC104Simulator"
-          !define PRODUCT_VERSION "${{ github.ref_name }}"
-          OutFile "IEC104Simulator-${{ github.ref_name }}-setup-${{ matrix.rid }}.exe"
-          InstallDir "$PROGRAMFILES\\${PRODUCT_NAME}"
-          Page directory
-          Page instfiles
-          Section "Install"
-            SetOutPath "$INSTDIR"
-            File /r "publish\\*"
-            CreateShortCut "$DESKTOP\\${PRODUCT_NAME}.lnk" "$INSTDIR\\IEC104Simulator.exe"
-          SectionEnd
-'@
-          $nsi | Out-File -FilePath installer.nsi -Encoding ASCII
-          # run makensis
-          makensis installer.nsi
 
       - name: Package (Linux / macOS tarball)
         if: matrix.rid != 'win-x64'
@@ -92,5 +73,4 @@ jobs:
         with:
           files: |
             IEC104Simulator-${{ github.ref_name }}-${{ matrix.rid }}.${{ matrix.ext }}
-            IEC104Simulator-${{ github.ref_name }}-setup-${{ matrix.rid }}.exe
           generate_release_notes: true
