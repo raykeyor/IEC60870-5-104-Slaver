@@ -37,7 +37,9 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      # shell: bash works on all runners (Git Bash on Windows, bash on Linux/macOS)
       - name: Publish
+        shell: bash
         run: |
           dotnet publish IEC104Simulator/IEC104Simulator.csproj \
             -c Release \
@@ -47,30 +49,39 @@ jobs:
             -p:PublishTrimmed=false \
             -o ./publish
 
-      - name: Prepare runtime wrapper and package
+      # Add run.sh + ensure executable bit (Linux / macOS only)
+      - name: Add run script (Linux / macOS)
+        if: runner.os != 'Windows'
         run: |
-          # create runnable start scripts for *nix
           printf '#!/usr/bin/env bash\nDIR="$(cd "$(dirname "$0")" && pwd)"\n"$DIR/IEC104Simulator" "$@"\n' > ./publish/run.sh
           chmod +x ./publish/run.sh
-          # create windows launcher
-          printf '@echo off\n"%%~dp0\\IEC104Simulator.exe" %%*\n' > ./publish\run.bat
+          chmod +x ./publish/IEC104Simulator
 
-      - name: Package (Windows zip)
-        if: matrix.rid == 'win-x64'
+      # Add run.bat (Windows only)
+      - name: Add run script (Windows)
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          # zip the publish folder
-          Compress-Archive -Path ./publish/* -DestinationPath IEC104Simulator-${{ github.ref_name }}-${{ matrix.rid }}.zip
+          '@echo off'                        | Out-File -FilePath ./publish/run.bat -Encoding ASCII
+          '"%~dp0\IEC104Simulator.exe" %*'  | Out-File -FilePath ./publish/run.bat -Encoding ASCII -Append
 
-      - name: Package (Linux / macOS tarball)
-        if: matrix.rid != 'win-x64'
+      # Package Windows -> zip
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
         run: |
-          # ensure executable bit preserved in tar
-          tar -czf IEC104Simulator-${{ github.ref_name }}-${{ matrix.rid }}.tar.gz -C ./publish .
+          Compress-Archive -Path ./publish/* `
+            -DestinationPath "IEC104Simulator-${{ github.ref_name }}-${{ matrix.rid }}.zip"
+
+      # Package Linux / macOS -> tar.gz (preserves executable permission)
+      - name: Package (Linux / macOS)
+        if: runner.os != 'Windows'
+        run: |
+          tar -czf "IEC104Simulator-${{ github.ref_name }}-${{ matrix.rid }}.tar.gz" \
+            -C ./publish .
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            IEC104Simulator-${{ github.ref_name }}-${{ matrix.rid }}.${{ matrix.ext }}
+          files: IEC104Simulator-${{ github.ref_name }}-${{ matrix.rid }}.${{ matrix.ext }}
           generate_release_notes: true
