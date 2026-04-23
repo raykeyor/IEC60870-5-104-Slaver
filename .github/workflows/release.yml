@@ -38,26 +38,59 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Publish
-        run: >
-          dotnet publish IEC104Simulator/IEC104Simulator.csproj
-          -c Release
-          -r ${{ matrix.rid }}
-          --self-contained true
-          -p:PublishSingleFile=true
-          -p:IncludeNativeLibrariesForSelfExtract=true
-          -o ./publish
+        run: |
+          dotnet publish IEC104Simulator/IEC104Simulator.csproj \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            --self-contained true \
+            -p:PublishSingleFile=false \
+            -p:PublishTrimmed=false \
+            -o ./publish
 
-      - name: Package (Windows)
+      - name: Prepare runtime wrapper and package
+        run: |
+          # create runnable start scripts for *nix
+          printf '#!/usr/bin/env bash\nDIR="$(cd "$(dirname "$0")" && pwd)"\n"$DIR/IEC104Simulator" "$@"\n' > ./publish/run.sh
+          chmod +x ./publish/run.sh
+          # create windows launcher
+          printf '@echo off\n"%%~dp0\\IEC104Simulator.exe" %%*\n' > ./publish\run.bat
+
+      - name: Package (Windows and create NSIS installer)
         if: matrix.rid == 'win-x64'
         shell: pwsh
-        run: Compress-Archive -Path ./publish/* -DestinationPath IEC104Simulator-${{ github.ref_name }}-${{ matrix.rid }}.zip
+        run: |
+          # ensure NSIS is available
+          choco install nsis -y
+          # zip the publish folder
+          Compress-Archive -Path ./publish/* -DestinationPath IEC104Simulator-${{ github.ref_name }}-${{ matrix.rid }}.zip
+          # create NSIS script
+          $nsi = @'
+          !define PRODUCT_NAME "IEC104Simulator"
+          !define PRODUCT_VERSION "${{ github.ref_name }}"
+          OutFile "IEC104Simulator-${{ github.ref_name }}-setup-${{ matrix.rid }}.exe"
+          InstallDir "$PROGRAMFILES\\${PRODUCT_NAME}"
+          Page directory
+          Page instfiles
+          Section "Install"
+            SetOutPath "$INSTDIR"
+            File /r "publish\\*"
+            CreateShortCut "$DESKTOP\\${PRODUCT_NAME}.lnk" "$INSTDIR\\IEC104Simulator.exe"
+          SectionEnd
+'@
+          $nsi | Out-File -FilePath installer.nsi -Encoding ASCII
+          # run makensis
+          makensis installer.nsi
 
-      - name: Package (Linux / macOS)
+      - name: Package (Linux / macOS tarball)
         if: matrix.rid != 'win-x64'
-        run: tar -czf IEC104Simulator-${{ github.ref_name }}-${{ matrix.rid }}.tar.gz -C ./publish .
+        run: |
+          # ensure executable bit preserved in tar
+          tar -czf IEC104Simulator-${{ github.ref_name }}-${{ matrix.rid }}.tar.gz -C ./publish .
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: IEC104Simulator-${{ github.ref_name }}-${{ matrix.rid }}.${{ matrix.ext }}
+          files: |
+            IEC104Simulator-${{ github.ref_name }}-${{ matrix.rid }}.${{ matrix.ext }}
+            IEC104Simulator-${{ github.ref_name }}-setup-${{ matrix.rid }}.exe
           generate_release_notes: true
